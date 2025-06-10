@@ -13,6 +13,11 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as clerk_user_webhook from "../clerk_user_webhook.js";
+import type * as functions from "../functions.js";
+import type * as http from "../http.js";
+import type * as types from "../types.js";
+import type * as user from "../user.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -22,7 +27,13 @@ import type {
  * const myFunctionReference = api.myModule.myFunction;
  * ```
  */
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  clerk_user_webhook: typeof clerk_user_webhook;
+  functions: typeof functions;
+  http: typeof http;
+  types: typeof types;
+  user: typeof user;
+}>;
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">

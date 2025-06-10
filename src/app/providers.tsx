@@ -6,6 +6,7 @@ import { ThemeProvider } from "next-themes";
 import { ToasterProvider } from "@/components/providers/ToastProvider";
 import ConvexClientProvider from "@/components/providers/ConvexClientProvider";
 import QueryClientProvider from "@/components/providers/QueryClientProvider";
+import { env } from "@/env";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -15,7 +16,7 @@ export function Providers({ children }: { children: ReactNode }) {
       enableSystem
       disableTransitionOnChange
     >
-      <ClerkProvider>
+      <ClerkProvider publishableKey={env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
         <ConvexClientProvider>
           <QueryClientProvider>{children}</QueryClientProvider>
         </ConvexClientProvider>
