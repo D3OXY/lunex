@@ -1,4 +1,5 @@
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import "@/styles/globals.css";
 
 import { type Metadata } from "next";
@@ -19,7 +20,13 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${oswald.variable}`}>
+    <html
+      lang="en"
+      className={cn(
+        oswald.variable,
+        "dark bg-background font-oswald min-h-screen antialiased",
+      )}
+    >
       <body>{children}</body>
     </html>
   );
