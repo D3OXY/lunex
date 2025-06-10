@@ -12,6 +12,7 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { Settings } from "lucide-react";
+import Link from "next/link";
 
 export default function SidebarWrapper({
   children,
@@ -38,9 +39,11 @@ export default function SidebarWrapper({
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton>
-                <Settings />
-                Manage
+              <SidebarMenuButton asChild>
+                <Link href="/settings">
+                  <Settings />
+                  Manage
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
