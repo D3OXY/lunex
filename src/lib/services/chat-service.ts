@@ -27,11 +27,17 @@ interface StreamingResponse {
     error?: string;
 }
 
+interface OpenAIStreamChoiceDelta {
+    content?: string;
+}
+
+interface OpenAIStreamChoice {
+    delta?: OpenAIStreamChoiceDelta;
+}
+
 interface OpenAIStreamResponse {
     choices?: Array<{
-        delta?: {
-            content?: string;
-        };
+        delta?: OpenAIStreamChoiceDelta;
     }>;
 }
 
@@ -197,8 +203,16 @@ export class ChatService {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data: CompletionResponse = await response.json();
-            return data.message;
+            const raw = (await response.json()) as unknown;
+            if (
+                typeof raw === "object" &&
+                raw !== null &&
+                "message" in raw &&
+                typeof (raw as CompletionResponse).message === "string"
+            ) {
+                return (raw as CompletionResponse).message;
+            }
+            throw new Error("Invalid completion response");
         } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error("Unknown error");
             console.error("Non-streaming error:", err.message);
@@ -302,8 +316,11 @@ export function useChatService() {
                             console.error("Stream error:", error);
                             attempt += 1;
                             if (attempt < maxAttempts) {
-                                console.info(`Retrying stream (attempt ${attempt + 1}/${maxAttempts})...`);
-                                void executeStream();
+                                const backoffMs = 1000 * attempt;
+                                console.info(`Retrying stream in ${backoffMs}ms (attempt ${attempt + 1}/${maxAttempts})...`);
+                                setTimeout(() => {
+                                    void executeStream();
+                                }, backoffMs);
                             } else {
                                 setIsStreaming(false);
                                 clearStreamingMessage();
@@ -342,3 +359,11 @@ export function useChatService() {
         chatService,
     };
 }
+
+const sleep = (ms: number): Promise<void> => new Promise((res) => setTimeout(res, ms));
+
+const isStreamingResponse = (value: unknown): value is StreamingResponse => {
+    if (typeof value !== "object" || value === null) return false;
+    const t = (value as StreamingResponse).type;
+    return t === "start" || t === "delta" || t === "complete" || t === "error";
+};
