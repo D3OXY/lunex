@@ -225,7 +225,7 @@ export function useChatService() {
     const updateChatTitle = useMutation(api.chats.updateChatTitle);
 
     const chatService = ChatService.getInstance();
-    const { setIsStreaming, setStreamingMessage, clearStreamingMessage, addMessage: addMessageToStore, addChat: addChatToStore, getCurrentChat } = useChatStore();
+    const { setIsStreaming, addMessage: addMessageToStore, updateMessage, addChat: addChatToStore, getCurrentChat } = useChatStore();
 
     const sendMessage = async (content: string, chatId?: Id<"chats">, userId?: Id<"users">): Promise<Id<"chats">> => {
         try {
@@ -256,11 +256,19 @@ export function useChatService() {
             // Add user message to store (optimistic UI update); will be persisted via updateMessages later
             addMessageToStore(currentChatId, { role: "user", content });
 
-            const currentChat = getCurrentChat();
-            const messages: Message[] = currentChat ? [...currentChat.messages, { role: "user", content }] : [{ role: "user", content }];
+            // Snapshot current messages (includes the user message we just added, but not the upcoming placeholder)
+            const baseMessages: Message[] = getCurrentChat()?.messages ?? [{ role: "user", content }];
+
+            // Add placeholder assistant message that will be updated as stream arrives
+            addMessageToStore(currentChatId, { role: "assistant", content: "", isStreaming: true });
+
+            // Index of the assistant placeholder message (0-based)
+            const assistantIndex = baseMessages.length;
+
+            // We will stream based on the base messages (without placeholder) for persistence
+            const messages: Message[] = [...baseMessages];
 
             setIsStreaming(true);
-            clearStreamingMessage();
 
             let fullResponse = "";
 
@@ -273,11 +281,13 @@ export function useChatService() {
                         messages,
                         currentChatId,
                         (chunk) => {
-                            setStreamingMessage(fullResponse + chunk);
                             fullResponse += chunk;
 
+                            // Update the placeholder message locally for smooth streaming
+                            updateMessage(currentChatId, assistantIndex, fullResponse);
+
                             // Persist partial content
-                            const sanitized: Message[] = messages.map((m) => ({ role: m.role, content: m.content }));
+                            const sanitized: Message[] = baseMessages.map((m) => ({ role: m.role, content: m.content }));
                             void updateMessages({
                                 chatId: currentChatId,
                                 messages: [...sanitized, { role: "assistant", content: fullResponse }],
@@ -285,8 +295,8 @@ export function useChatService() {
                         },
                         (response) => {
                             setIsStreaming(false);
-                            clearStreamingMessage();
-                            addMessageToStore(currentChatId, { role: "assistant", content: response });
+                            // Replace the placeholder's streaming flag by updating its content one final time
+                            updateMessage(currentChatId, assistantIndex, response);
                         },
                         (error: string) => {
                             console.error("Stream error:", error);
@@ -299,11 +309,7 @@ export function useChatService() {
                                 }, backoffMs);
                             } else {
                                 setIsStreaming(false);
-                                clearStreamingMessage();
-                                addMessageToStore(currentChatId, {
-                                    role: "assistant",
-                                    content: `Error after ${maxAttempts} attempts: ${error}`,
-                                });
+                                updateMessage(currentChatId, assistantIndex, `Error after ${maxAttempts} attempts: ${error}`);
                             }
                         }
                     );
@@ -317,7 +323,6 @@ export function useChatService() {
             return currentChatId;
         } catch (error: unknown) {
             setIsStreaming(false);
-            clearStreamingMessage();
             const message = error instanceof Error ? error.message : "Unknown error";
             console.error("Send message error:", message);
             throw new Error(message);

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "../../../convex/_generated/api";
-import { useChatStore, useCurrentChat, useIsStreaming, useStreamingMessage } from "@/lib/stores/chat-store";
+import { useChatStore, useCurrentChat, useIsStreaming } from "@/lib/stores/chat-store";
 import { useChatService } from "@/lib/services/chat-service";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useRouter } from "next/navigation";
@@ -32,7 +32,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const { setCurrentChatId, setChats } = useChatStore();
     const currentChat = useCurrentChat();
     const isStreaming = useIsStreaming();
-    const streamingMessage = useStreamingMessage();
 
     // Service hooks
     const { sendMessage, createChat } = useChatService();
@@ -63,7 +62,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     // Auto-scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [currentChat?.messages, streamingMessage]);
+    }, [currentChat?.messages, isStreaming]);
 
     const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
@@ -102,17 +101,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         }
     };
 
-    const messages = currentChat?.messages ?? [];
-    const allMessages = [...messages];
-
-    // Add streaming message if active
-    if (isStreaming && streamingMessage) {
-        allMessages.push({
-            role: "assistant" as const,
-            content: streamingMessage,
-            isStreaming: true,
-        });
-    }
+    const allMessages = currentChat?.messages ?? [];
 
     if (!currentUser) {
         return (
@@ -140,14 +129,14 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                         <div className="text-muted-foreground flex h-32 items-center justify-center">Start a conversation by typing a message below</div>
                     ) : (
                         allMessages.map((msg, index) => (
-                            <AIMessage key={index} from={msg.role}>
+                            <AIMessage key={`${index}-${msg.role}`} from={msg.role}>
                                 <AIMessageAvatar
                                     src={msg.role === "user" ? (clerkUser?.imageUrl ?? "") : "/ai-avatar.png"}
                                     name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "T3"}
                                 />
                                 <AIMessageContent>
                                     {msg.role === "assistant" ? <AIResponse>{msg.content}</AIResponse> : <div className="text-sm">{msg.content}</div>}
-                                    {"isStreaming" in msg && msg.isStreaming && (
+                                    {msg.isStreaming && isStreaming && (
                                         <div className="mt-2 flex items-center gap-1">
                                             <div className="h-2 w-2 animate-pulse rounded-full bg-current" />
                                             <span className="text-xs opacity-70">Generating...</span>
