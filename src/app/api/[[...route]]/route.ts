@@ -63,6 +63,10 @@ app.post("/chat/test", async (c) => {
     }
 });
 
+// System prompt to ensure responses include properly fenced code blocks with language identifiers.
+const SYSTEM_PROMPT =
+    "You are Lunex AI. When providing code, always wrap it in fenced markdown blocks with the appropriate language tag (e.g., ```tsx). Do not include extra commentary inside the fences." as const;
+
 // Chat streaming endpoint with OpenRouter
 app.post("/chat/stream", async (c) => {
     try {
@@ -73,11 +77,14 @@ app.post("/chat/stream", async (c) => {
             return c.json({ error: "Messages array is required" }, 400);
         }
 
-        // Transform messages to CoreMessage format
-        const coreMessages: CoreMessage[] = messages.map((msg) => ({
-            role: msg.role as "user" | "assistant" | "system",
-            content: msg.content,
-        }));
+        // Prepend system prompt to guide response formatting
+        const coreMessages: CoreMessage[] = [
+            { role: "system", content: SYSTEM_PROMPT },
+            ...messages.map((msg) => ({
+                role: msg.role as "user" | "assistant" | "system",
+                content: msg.content,
+            })),
+        ];
 
         const result = await streamText({
             model: openrouter("google/gemini-2.0-flash-001"),
@@ -104,11 +111,14 @@ app.post("/chat/completion", async (c) => {
             return c.json({ error: "Messages array is required" }, 400);
         }
 
-        // Transform messages to CoreMessage format
-        const coreMessages: CoreMessage[] = messages.map((msg) => ({
-            role: msg.role as "user" | "assistant" | "system",
-            content: msg.content,
-        }));
+        // Prepend system prompt
+        const coreMessages: CoreMessage[] = [
+            { role: "system", content: SYSTEM_PROMPT },
+            ...messages.map((msg) => ({
+                role: msg.role as "user" | "assistant" | "system",
+                content: msg.content,
+            })),
+        ];
 
         const result = await streamText({
             model: openrouter("google/gemini-2.0-flash-001"),
@@ -144,11 +154,14 @@ app.post("/chat/custom-stream", async (c) => {
                 return;
             }
 
-            // Transform messages to CoreMessage format
-            const coreMessages: CoreMessage[] = messages.map((msg) => ({
-                role: msg.role as "user" | "assistant" | "system",
-                content: msg.content,
-            }));
+            // Prepend system prompt to enforce code block formatting
+            const coreMessages: CoreMessage[] = [
+                { role: "system", content: SYSTEM_PROMPT },
+                ...messages.map((msg) => ({
+                    role: msg.role as "user" | "assistant" | "system",
+                    content: msg.content,
+                })),
+            ];
 
             const result = await streamText({
                 model: openrouter("google/gemini-2.0-flash-001"),

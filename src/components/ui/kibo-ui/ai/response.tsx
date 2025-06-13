@@ -87,6 +87,14 @@ const components: Options["components"] = {
         </h6>
     ),
     code: ({ node, className, children }) => {
+        // If className contains language-, it's a code block; otherwise it's inline code
+        const hasLanguageClass = typeof className === "string" && className.includes("language-");
+
+        if (!hasLanguageClass) {
+            return <code className={cn("bg-muted rounded px-1.5 py-0.5 font-mono text-sm", className)}>{children}</code>;
+        }
+
+        // For code blocks (fenced code), render with full CodeBlock component
         let language = "javascript";
 
         if (typeof node?.properties?.className === "string") {
@@ -96,7 +104,7 @@ const components: Options["components"] = {
         const data: CodeBlockProps["data"] = [
             {
                 language,
-                filename: "index.js",
+                filename: `code.${language === "javascript" ? "js" : language}`,
                 code: children as string,
             },
         ];

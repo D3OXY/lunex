@@ -13,6 +13,8 @@ import { useRouter } from "next/navigation";
 import { AIInput, AIInputTextarea, AIInputToolbar, AIInputSubmit } from "@/components/ui/kibo-ui/ai/input";
 import { AIMessage, AIMessageContent, AIMessageAvatar } from "@/components/ui/kibo-ui/ai/message";
 import { AIResponse } from "@/components/ui/kibo-ui/ai/response";
+import { AIBranch, AIBranchMessages, AIBranchSelector, AIBranchPrevious, AIBranchNext, AIBranchPage } from "@/components/ui/kibo-ui/ai/branch";
+import { AISuggestions, AISuggestion } from "@/components/ui/kibo-ui/ai/suggestion";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -63,6 +65,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [currentChat?.messages, isStreaming]);
+
+    const defaultSuggestions = ["Can you elaborate?", "Give me an example", "Summarize the above", "List key points"];
 
     const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
@@ -124,34 +128,54 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
             {/* Messages */}
             <ScrollArea className="flex-1 px-4">
-                <div className="space-y-4 py-4">
-                    {allMessages.length === 0 ? (
-                        <div className="text-muted-foreground flex h-32 items-center justify-center">Start a conversation by typing a message below</div>
-                    ) : (
-                        allMessages.map((msg, index) => (
-                            <AIMessage key={`${index}-${msg.role}`} from={msg.role}>
-                                <AIMessageAvatar
-                                    src={msg.role === "user" ? (clerkUser?.imageUrl ?? "") : "/ai-avatar.png"}
-                                    name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "T3"}
-                                />
-                                <AIMessageContent>
-                                    {msg.role === "assistant" ? <AIResponse>{msg.content}</AIResponse> : <div className="text-sm">{msg.content}</div>}
-                                    {msg.isStreaming && isStreaming && (
-                                        <div className="mt-2 flex items-center gap-1">
-                                            <div className="h-2 w-2 animate-pulse rounded-full bg-current" />
-                                            <span className="text-xs opacity-70">Generating...</span>
-                                        </div>
-                                    )}
-                                </AIMessageContent>
-                            </AIMessage>
-                        ))
-                    )}
-                    <div ref={messagesEndRef} />
-                </div>
+                <AIBranch className="h-full">
+                    <AIBranchMessages>
+                        <div className="space-y-4 py-4">
+                            {allMessages.length === 0 ? (
+                                <div className="text-muted-foreground flex h-32 items-center justify-center">Start a conversation by typing a message below</div>
+                            ) : (
+                                allMessages.map((msg, index) => (
+                                    <AIMessage key={`${index}-${msg.role}`} from={msg.role}>
+                                        <AIMessageAvatar
+                                            src={msg.role === "user" ? (clerkUser?.imageUrl ?? "") : "/ai-avatar.png"}
+                                            name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "T3"}
+                                        />
+                                        <AIMessageContent>
+                                            {msg.role === "assistant" ? <AIResponse>{msg.content}</AIResponse> : <div className="text-sm">{msg.content}</div>}
+                                            {msg.isStreaming && isStreaming && (
+                                                <div className="mt-2 flex items-center gap-1">
+                                                    <div className="h-2 w-2 animate-pulse rounded-full bg-current" />
+                                                    <span className="text-xs opacity-70">Generating...</span>
+                                                </div>
+                                            )}
+                                        </AIMessageContent>
+                                    </AIMessage>
+                                ))
+                            )}
+                            <div ref={messagesEndRef} />
+                        </div>
+                    </AIBranchMessages>
+
+                    {/* Branch Navigation (hidden when only one branch) */}
+                    <AIBranchSelector from="assistant" className="py-2">
+                        <AIBranchPrevious />
+                        <AIBranchPage />
+                        <AIBranchNext />
+                    </AIBranchSelector>
+                </AIBranch>
             </ScrollArea>
 
-            {/* Input */}
-            <div className="border-t p-4">
+            {/* Input & Suggestions */}
+            <div className="space-y-2 border-t p-4">
+                {message.trim() === "" && !isStreaming && (
+                    <AISuggestions>
+                        {defaultSuggestions.map((s) => (
+                            <AISuggestion key={s} suggestion={s} onClick={setMessage}>
+                                {s}
+                            </AISuggestion>
+                        ))}
+                    </AISuggestions>
+                )}
                 <AIInput onSubmit={handleSubmit}>
                     <AIInputTextarea
                         value={message}
