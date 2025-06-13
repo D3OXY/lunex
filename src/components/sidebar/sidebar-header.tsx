@@ -8,9 +8,11 @@ import {
 } from "@/components/ui/sidebar";
 import { Plus, Search } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 export function SidebarHeader() {
   const { open } = useSidebar();
+  const router = useRouter();
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -21,7 +23,12 @@ export function SidebarHeader() {
               <Button variant="ghost" size="icon">
                 <Search />
               </Button>
-              <Button variant="ghost" size="icon">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push("/")}
+                aria-label="New Chat"
+              >
                 <Plus />
               </Button>
             </div>

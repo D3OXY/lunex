@@ -7,6 +7,7 @@ import { api } from "../../../convex/_generated/api";
 import { useChatStore, useCurrentChat, useIsStreaming, useStreamingMessage } from "@/lib/stores/chat-store";
 import { useChatService } from "@/lib/services/chat-service";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { useRouter } from "next/navigation";
 
 // AI Components
 import { AIInput, AIInputTextarea, AIInputToolbar, AIInputSubmit } from "@/components/ui/kibo-ui/ai/input";
@@ -43,6 +44,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const currentUser = useQuery(api.user.current, {});
     const userChats = useQuery(api.chats.getUserChats, currentUser && currentUser._id ? { userId: currentUser._id } : "skip");
 
+    const router = useRouter();
+
     // Set current chat when chatId changes
     useEffect(() => {
         if (chatId) {
@@ -62,14 +65,19 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [currentChat?.messages, streamingMessage]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         if (!message.trim() || isSubmitting || !currentUser?._id) return;
 
         setIsSubmitting(true);
         try {
-            await sendMessage(message.trim(), chatId, currentUser._id);
+            const newChatId = await sendMessage(message.trim(), chatId, currentUser._id);
             setMessage("");
+
+            // If we are on the root path (starting a brand-new chat), redirect to the new chat route
+            if (!chatId && newChatId) {
+                router.push(`/chat/${newChatId}`);
+            }
         } catch (error) {
             console.error("Failed to send message:", error);
         } finally {
