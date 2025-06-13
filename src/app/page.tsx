@@ -6,15 +6,18 @@ import { Authenticated, Unauthenticated } from "convex/react";
 import { Button } from "@/components/ui/button";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { MessageSquareIcon } from "lucide-react";
+import { ErrorBoundary } from "@/components/providers/ErrorBoundary";
 
 export default function Home(): React.ReactElement {
   return (
     <>
       <Authenticated>
-        <SidebarWrapper>
-          {/* No chatId -> new chat will be created on first message */}
-          <ChatInterface />
-        </SidebarWrapper>
+        <ErrorBoundary>
+          <SidebarWrapper>
+            {/* No chatId -> new chat will be created on first message */}
+            <ChatInterface />
+          </SidebarWrapper>
+        </ErrorBoundary>
       </Authenticated>
 
       <Unauthenticated>

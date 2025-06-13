@@ -265,48 +265,53 @@ export function useChatService() {
 
             let fullResponse = "";
 
-            await chatService.sendMessageCustomStream(
-                messages as Message[],
-                currentChatId,
-                (chunk) => {
-                    setStreamingMessage(fullResponse + chunk);
-                    fullResponse += chunk;
+            let attempt = 0;
+            const maxAttempts = 3;
 
-                    // Persist partial content for reliability
-                    if (currentChatId) {
-                        const sanitized: Message[] = messages.map((m) => ({ role: m.role, content: m.content }));
-                        void updateMessages({
-                            chatId: currentChatId,
-                            messages: [...sanitized, { role: "assistant", content: fullResponse + chunk }],
-                        });
-                    }
-                },
-                (response) => {
-                    setIsStreaming(false);
-                    clearStreamingMessage();
+            const executeStream = async (): Promise<void> => {
+                try {
+                    await chatService.sendMessageCustomStream(
+                        messages as Message[],
+                        currentChatId,
+                        (chunk) => {
+                            setStreamingMessage(fullResponse + chunk);
+                            fullResponse += chunk;
 
-                    // Add assistant message to Convex
-                    void addMessage({
-                        chatId: currentChatId,
-                        role: "assistant",
-                        content: response,
-                    });
-
-                    // Add assistant message to store
-                    addMessageToStore(currentChatId, { role: "assistant", content: response });
-                },
-                (error) => {
-                    setIsStreaming(false);
-                    clearStreamingMessage();
-                    console.error("Chat error:", error);
-
-                    // Add error message to store
-                    addMessageToStore(currentChatId, {
-                        role: "assistant",
-                        content: `Error: ${error}`,
-                    });
+                            // Persist partial content
+                            const sanitized: Message[] = messages.map((m) => ({ role: m.role, content: m.content }));
+                            void updateMessages({
+                                chatId: currentChatId,
+                                messages: [...sanitized, { role: "assistant", content: fullResponse }],
+                            });
+                        },
+                        (response) => {
+                            setIsStreaming(false);
+                            clearStreamingMessage();
+                            void addMessage({ chatId: currentChatId, role: "assistant", content: response });
+                            addMessageToStore(currentChatId, { role: "assistant", content: response });
+                        },
+                        (error) => {
+                            console.error("Stream error:", error);
+                            attempt += 1;
+                            if (attempt < maxAttempts) {
+                                console.info(`Retrying stream (attempt ${attempt + 1}/${maxAttempts})...`);
+                                void executeStream();
+                            } else {
+                                setIsStreaming(false);
+                                clearStreamingMessage();
+                                addMessageToStore(currentChatId, {
+                                    role: "assistant",
+                                    content: `Error after ${maxAttempts} attempts: ${error}`,
+                                });
+                            }
+                        }
+                    );
+                } catch (err) {
+                    console.error("executeStream error", err);
                 }
-            );
+            };
+
+            await executeStream();
 
             return currentChatId;
         } catch (error) {
