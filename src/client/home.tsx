@@ -1,6 +1,8 @@
 "use client";
 
-import { ChatLayout } from "@/components/chat/chat-layout";
+import { ChatInterface } from "@/components/chat/chat-interface";
+import { ErrorBoundary } from "@/components/providers/ErrorBoundary";
+import SidebarWrapper from "@/components/sidebar/sidebar-wrapper";
 import { Button } from "@/components/ui/button";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { Authenticated, Unauthenticated } from "convex/react";
@@ -10,9 +12,12 @@ export default function Home(): React.JSX.Element {
     return (
         <>
             <Authenticated>
-                <div className="h-full w-full">
-                    <ChatLayout />
-                </div>
+                <ErrorBoundary>
+                    <SidebarWrapper>
+                        {/* No chatId -> new chat will be created on first message */}
+                        <ChatInterface />
+                    </SidebarWrapper>
+                </ErrorBoundary>
             </Authenticated>
 
             <Unauthenticated>
