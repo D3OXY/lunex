@@ -204,12 +204,7 @@ export class ChatService {
             }
 
             const raw = (await response.json()) as unknown;
-            if (
-                typeof raw === "object" &&
-                raw !== null &&
-                "message" in raw &&
-                typeof (raw as CompletionResponse).message === "string"
-            ) {
+            if (typeof raw === "object" && raw !== null && "message" in raw && typeof (raw as CompletionResponse).message === "string") {
                 return (raw as CompletionResponse).message;
             }
             throw new Error("Invalid completion response");
@@ -230,20 +225,9 @@ export function useChatService() {
     const updateChatTitle = useMutation(api.chats.updateChatTitle);
 
     const chatService = ChatService.getInstance();
-    const {
-        setIsStreaming,
-        setStreamingMessage,
-        clearStreamingMessage,
-        addMessage: addMessageToStore,
-        addChat: addChatToStore,
-        getCurrentChat,
-    } = useChatStore();
+    const { setIsStreaming, setStreamingMessage, clearStreamingMessage, addMessage: addMessageToStore, addChat: addChatToStore, getCurrentChat } = useChatStore();
 
-    const sendMessage = async (
-        content: string,
-        chatId?: Id<"chats">,
-        userId?: Id<"users">
-    ): Promise<Id<"chats">> => {
+    const sendMessage = async (content: string, chatId?: Id<"chats">, userId?: Id<"users">): Promise<Id<"chats">> => {
         try {
             let currentChatId = chatId;
 
@@ -269,14 +253,7 @@ export function useChatService() {
                 throw new Error("Chat ID not available");
             }
 
-            // Add user message to Convex
-            await addMessage({
-                chatId: currentChatId,
-                role: "user",
-                content,
-            });
-
-            // Add user message to store
+            // Add user message to store (optimistic UI update); will be persisted via updateMessages later
             addMessageToStore(currentChatId, { role: "user", content });
 
             const currentChat = getCurrentChat();
@@ -309,7 +286,6 @@ export function useChatService() {
                         (response) => {
                             setIsStreaming(false);
                             clearStreamingMessage();
-                            void addMessage({ chatId: currentChatId, role: "assistant", content: response });
                             addMessageToStore(currentChatId, { role: "assistant", content: response });
                         },
                         (error: string) => {
@@ -332,10 +308,7 @@ export function useChatService() {
                         }
                     );
                 } catch (err: unknown) {
-                    console.error(
-                        "executeStream error",
-                        err instanceof Error ? err.message : err
-                    );
+                    console.error("executeStream error", err instanceof Error ? err.message : err);
                 }
             };
 

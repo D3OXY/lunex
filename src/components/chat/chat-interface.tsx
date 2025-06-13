@@ -143,7 +143,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                             <AIMessage key={index} from={msg.role}>
                                 <AIMessageAvatar
                                     src={msg.role === "user" ? (clerkUser?.imageUrl ?? "") : "/ai-avatar.png"}
-                                    name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "Assistant"}
+                                    name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "T3"}
                                 />
                                 <AIMessageContent>
                                     {msg.role === "assistant" ? <AIResponse>{msg.content}</AIResponse> : <div className="text-sm">{msg.content}</div>}
