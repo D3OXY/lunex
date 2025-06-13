@@ -3,8 +3,13 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useChatStore, type Chat } from "../stores/chat-store";
 
+type Role = "user" | "assistant";
+
+const isRole = (value: unknown): value is Role =>
+    value === "user" || value === "assistant";
+
 interface Message {
-    role: "user" | "assistant";
+    role: Role;
     content: string;
 }
 
@@ -103,9 +108,10 @@ export class ChatService {
             }
 
             onComplete?.(fullResponse);
-        } catch (error) {
-            console.error("Streaming error:", error);
-            onError?.(error instanceof Error ? error.message : "Unknown error");
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Unknown error";
+            console.error("Streaming error:", message);
+            onError?.(message);
         }
     }
 
@@ -170,9 +176,10 @@ export class ChatService {
                     }
                 }
             }
-        } catch (error) {
-            console.error("Custom streaming error:", error);
-            onError?.(error instanceof Error ? error.message : "Unknown error");
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Unknown error";
+            console.error("Custom streaming error:", message);
+            onError?.(message);
         }
     }
 
@@ -192,9 +199,10 @@ export class ChatService {
 
             const data: CompletionResponse = await response.json();
             return data.message;
-        } catch (error) {
-            console.error("Non-streaming error:", error);
-            throw error;
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error("Unknown error");
+            console.error("Non-streaming error:", err.message);
+            throw err;
         }
     }
 }
@@ -290,7 +298,7 @@ export function useChatService() {
                             void addMessage({ chatId: currentChatId, role: "assistant", content: response });
                             addMessageToStore(currentChatId, { role: "assistant", content: response });
                         },
-                        (error) => {
+                        (error: string) => {
                             console.error("Stream error:", error);
                             attempt += 1;
                             if (attempt < maxAttempts) {
@@ -306,19 +314,23 @@ export function useChatService() {
                             }
                         }
                     );
-                } catch (err) {
-                    console.error("executeStream error", err);
+                } catch (err: unknown) {
+                    console.error(
+                        "executeStream error",
+                        err instanceof Error ? err.message : err
+                    );
                 }
             };
 
             await executeStream();
 
             return currentChatId;
-        } catch (error) {
+        } catch (error: unknown) {
             setIsStreaming(false);
             clearStreamingMessage();
-            console.error("Send message error:", error);
-            throw error;
+            const message = error instanceof Error ? error.message : "Unknown error";
+            console.error("Send message error:", message);
+            throw new Error(message);
         }
     };
 
