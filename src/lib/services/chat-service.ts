@@ -1,0 +1,295 @@
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { useChatStore } from "../stores/chat-store";
+
+interface Message {
+    role: "user" | "assistant";
+    content: string;
+}
+
+interface Usage {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+}
+
+interface StreamingResponse {
+    type: "start" | "delta" | "complete" | "error";
+    content?: string;
+    chatId?: string;
+    usage?: Usage;
+    error?: string;
+}
+
+interface OpenAIStreamResponse {
+    choices?: Array<{
+        delta?: {
+            content?: string;
+        };
+    }>;
+}
+
+interface CompletionResponse {
+    message: string;
+    usage?: Usage;
+}
+
+export class ChatService {
+    private static instance: ChatService;
+
+    static getInstance(): ChatService {
+        if (!ChatService.instance) {
+            ChatService.instance = new ChatService();
+        }
+        return ChatService.instance;
+    }
+
+    async sendMessage(
+        messages: Message[],
+        chatId: Id<"chats">,
+        onStream?: (content: string) => void,
+        onComplete?: (fullResponse: string) => void,
+        onError?: (error: string) => void
+    ): Promise<void> {
+        try {
+            const response = await fetch("/api/chat/stream", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ messages, chatId }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) {
+                throw new Error("Response body is not readable");
+            }
+
+            const decoder = new TextDecoder();
+            let fullResponse = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split("\n").filter((line) => line.trim());
+
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        const data = line.slice(6);
+                        if (data === "[DONE]") {
+                            onComplete?.(fullResponse);
+                            return;
+                        }
+
+                        try {
+                            const parsed: OpenAIStreamResponse = JSON.parse(data);
+                            if (parsed.choices?.[0]?.delta?.content) {
+                                const content = parsed.choices[0].delta.content;
+                                fullResponse += content;
+                                onStream?.(content);
+                            }
+                        } catch (e) {
+                            // Ignore parsing errors for individual chunks
+                        }
+                    }
+                }
+            }
+
+            onComplete?.(fullResponse);
+        } catch (error) {
+            console.error("Streaming error:", error);
+            onError?.(error instanceof Error ? error.message : "Unknown error");
+        }
+    }
+
+    async sendMessageCustomStream(
+        messages: Message[],
+        chatId: Id<"chats">,
+        onStream?: (content: string) => void,
+        onComplete?: (fullResponse: string) => void,
+        onError?: (error: string) => void
+    ): Promise<void> {
+        try {
+            const response = await fetch("/api/chat/custom-stream", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ messages, chatId }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) {
+                throw new Error("Response body is not readable");
+            }
+
+            const decoder = new TextDecoder();
+            let fullResponse = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split("\n").filter((line) => line.trim());
+
+                for (const line of lines) {
+                    try {
+                        const data: StreamingResponse = JSON.parse(line);
+
+                        switch (data.type) {
+                            case "start":
+                                // Initialize streaming
+                                break;
+                            case "delta":
+                                if (data.content) {
+                                    fullResponse += data.content;
+                                    onStream?.(data.content);
+                                }
+                                break;
+                            case "complete":
+                                onComplete?.(fullResponse);
+                                return;
+                            case "error":
+                                onError?.(data.error ?? "Unknown error");
+                                return;
+                        }
+                    } catch (e) {
+                        // Ignore parsing errors for individual chunks
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Custom streaming error:", error);
+            onError?.(error instanceof Error ? error.message : "Unknown error");
+        }
+    }
+
+    async sendMessageNonStreaming(messages: Message[], chatId: Id<"chats">): Promise<string> {
+        try {
+            const response = await fetch("/api/chat/completion", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ messages, chatId }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data: CompletionResponse = await response.json();
+            return data.message;
+        } catch (error) {
+            console.error("Non-streaming error:", error);
+            throw error;
+        }
+    }
+}
+
+// Hook for using chat service with Convex integration
+export function useChatService() {
+    const createChat = useMutation(api.chats.createChat);
+    const addMessage = useMutation(api.chats.addMessage);
+    const updateMessages = useMutation(api.chats.updateMessages);
+    const deleteChat = useMutation(api.chats.deleteChat);
+    const updateChatTitle = useMutation(api.chats.updateChatTitle);
+
+    const chatService = ChatService.getInstance();
+    const { setIsStreaming, setStreamingMessage, clearStreamingMessage, addMessage: addMessageToStore, getCurrentChat } = useChatStore();
+
+    const sendMessage = async (content: string, chatId?: Id<"chats">, userId?: Id<"users">) => {
+        try {
+            let currentChatId = chatId;
+
+            // Create new chat if needed
+            if (!currentChatId && userId) {
+                const title = content.length > 50 ? content.substring(0, 50) + "..." : content;
+                currentChatId = await createChat({ userId, title });
+            }
+
+            if (!currentChatId) {
+                throw new Error("No chat ID available");
+            }
+
+            // Add user message to Convex
+            await addMessage({
+                chatId: currentChatId,
+                role: "user",
+                content,
+            });
+
+            // Add user message to store
+            addMessageToStore(currentChatId, { role: "user", content });
+
+            const currentChat = getCurrentChat();
+            const messages = currentChat ? [...currentChat.messages, { role: "user", content }] : [{ role: "user", content }];
+
+            setIsStreaming(true);
+            clearStreamingMessage();
+
+            let fullResponse = "";
+
+            await chatService.sendMessageCustomStream(
+                messages as Message[],
+                currentChatId,
+                (chunk) => {
+                    setStreamingMessage(fullResponse + chunk);
+                    fullResponse += chunk;
+                },
+                (response) => {
+                    setIsStreaming(false);
+                    clearStreamingMessage();
+
+                    // Add assistant message to Convex
+                    void addMessage({
+                        chatId: currentChatId,
+                        role: "assistant",
+                        content: response,
+                    });
+
+                    // Add assistant message to store
+                    addMessageToStore(currentChatId, { role: "assistant", content: response });
+                },
+                (error) => {
+                    setIsStreaming(false);
+                    clearStreamingMessage();
+                    console.error("Chat error:", error);
+
+                    // Add error message to store
+                    addMessageToStore(currentChatId, {
+                        role: "assistant",
+                        content: `Error: ${error}`,
+                    });
+                }
+            );
+
+            return currentChatId;
+        } catch (error) {
+            setIsStreaming(false);
+            clearStreamingMessage();
+            console.error("Send message error:", error);
+            throw error;
+        }
+    };
+
+    return {
+        sendMessage,
+        createChat,
+        deleteChat,
+        updateChatTitle,
+        chatService,
+    };
+}
