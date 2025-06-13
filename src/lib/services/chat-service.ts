@@ -1,7 +1,7 @@
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { useChatStore } from "../stores/chat-store";
+import { useChatStore, type Chat } from "../stores/chat-store";
 
 interface Message {
     role: "user" | "assistant";
@@ -208,9 +208,20 @@ export function useChatService() {
     const updateChatTitle = useMutation(api.chats.updateChatTitle);
 
     const chatService = ChatService.getInstance();
-    const { setIsStreaming, setStreamingMessage, clearStreamingMessage, addMessage: addMessageToStore, getCurrentChat } = useChatStore();
+    const {
+        setIsStreaming,
+        setStreamingMessage,
+        clearStreamingMessage,
+        addMessage: addMessageToStore,
+        addChat: addChatToStore,
+        getCurrentChat,
+    } = useChatStore();
 
-    const sendMessage = async (content: string, chatId?: Id<"chats">, userId?: Id<"users">) => {
+    const sendMessage = async (
+        content: string,
+        chatId?: Id<"chats">,
+        userId?: Id<"users">
+    ): Promise<Id<"chats">> => {
         try {
             let currentChatId = chatId;
 
@@ -218,10 +229,22 @@ export function useChatService() {
             if (!currentChatId && userId) {
                 const title = content.length > 50 ? content.substring(0, 50) + "..." : content;
                 currentChatId = await createChat({ userId, title });
+
+                // Optimistically add chat to local store so it appears immediately in sidebar
+                if (currentChatId) {
+                    const newChat: Chat = {
+                        _id: currentChatId,
+                        userId,
+                        title,
+                        messages: [],
+                        _creationTime: Date.now(),
+                    };
+                    addChatToStore(newChat);
+                }
             }
 
             if (!currentChatId) {
-                throw new Error("No chat ID available");
+                throw new Error("Chat ID not available");
             }
 
             // Add user message to Convex
@@ -235,7 +258,7 @@ export function useChatService() {
             addMessageToStore(currentChatId, { role: "user", content });
 
             const currentChat = getCurrentChat();
-            const messages = currentChat ? [...currentChat.messages, { role: "user", content }] : [{ role: "user", content }];
+            const messages: Message[] = currentChat ? [...currentChat.messages, { role: "user", content }] : [{ role: "user", content }];
 
             setIsStreaming(true);
             clearStreamingMessage();
@@ -248,6 +271,15 @@ export function useChatService() {
                 (chunk) => {
                     setStreamingMessage(fullResponse + chunk);
                     fullResponse += chunk;
+
+                    // Persist partial content for reliability
+                    if (currentChatId) {
+                        const sanitized: Message[] = messages.map((m) => ({ role: m.role, content: m.content }));
+                        void updateMessages({
+                            chatId: currentChatId,
+                            messages: [...sanitized, { role: "assistant", content: fullResponse + chunk }],
+                        });
+                    }
                 },
                 (response) => {
                     setIsStreaming(false);
