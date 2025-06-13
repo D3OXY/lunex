@@ -1,10 +1,12 @@
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { useChatStore } from "../stores/chat-store";
+import { useChatStore, type Chat } from "../stores/chat-store";
+
+type Role = "user" | "assistant";
 
 interface Message {
-    role: "user" | "assistant";
+    role: Role;
     content: string;
 }
 
@@ -22,11 +24,17 @@ interface StreamingResponse {
     error?: string;
 }
 
+interface OpenAIStreamChoiceDelta {
+    content?: string;
+}
+
+interface OpenAIStreamChoice {
+    delta?: OpenAIStreamChoiceDelta;
+}
+
 interface OpenAIStreamResponse {
     choices?: Array<{
-        delta?: {
-            content?: string;
-        };
+        delta?: OpenAIStreamChoiceDelta;
     }>;
 }
 
@@ -89,23 +97,24 @@ export class ChatService {
                         }
 
                         try {
-                            const parsed: OpenAIStreamResponse = JSON.parse(data);
-                            if (parsed.choices?.[0]?.delta?.content) {
-                                const content = parsed.choices[0].delta.content;
+                            const parsedUnknown = JSON.parse(data) as unknown;
+                            if (isOpenAIStreamResponse(parsedUnknown) && parsedUnknown.choices?.[0]?.delta?.content) {
+                                const content = parsedUnknown.choices[0].delta?.content ?? "";
                                 fullResponse += content;
                                 onStream?.(content);
                             }
-                        } catch (e) {
-                            // Ignore parsing errors for individual chunks
+                        } catch {
+                            // Silent JSON parse error – ignore malformed chunk
                         }
                     }
                 }
             }
 
             onComplete?.(fullResponse);
-        } catch (error) {
-            console.error("Streaming error:", error);
-            onError?.(error instanceof Error ? error.message : "Unknown error");
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Unknown error";
+            console.error("Streaming error:", message);
+            onError?.(message);
         }
     }
 
@@ -146,33 +155,37 @@ export class ChatService {
 
                 for (const line of lines) {
                     try {
-                        const data: StreamingResponse = JSON.parse(line);
+                        const parsedUnknown = JSON.parse(line) as unknown;
+                        if (!isStreamingResponse(parsedUnknown)) {
+                            continue;
+                        }
 
-                        switch (data.type) {
+                        switch (parsedUnknown.type) {
                             case "start":
                                 // Initialize streaming
                                 break;
                             case "delta":
-                                if (data.content) {
-                                    fullResponse += data.content;
-                                    onStream?.(data.content);
+                                if (parsedUnknown.content) {
+                                    fullResponse += parsedUnknown.content;
+                                    onStream?.(parsedUnknown.content);
                                 }
                                 break;
                             case "complete":
                                 onComplete?.(fullResponse);
                                 return;
                             case "error":
-                                onError?.(data.error ?? "Unknown error");
+                                onError?.(parsedUnknown.error ?? "Unknown error");
                                 return;
                         }
-                    } catch (e) {
+                    } catch {
                         // Ignore parsing errors for individual chunks
                     }
                 }
             }
-        } catch (error) {
-            console.error("Custom streaming error:", error);
-            onError?.(error instanceof Error ? error.message : "Unknown error");
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Unknown error";
+            console.error("Custom streaming error:", message);
+            onError?.(message);
         }
     }
 
@@ -190,11 +203,20 @@ export class ChatService {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data: CompletionResponse = await response.json();
-            return data.message;
-        } catch (error) {
-            console.error("Non-streaming error:", error);
-            throw error;
+            const raw = (await response.json()) as unknown;
+            if (
+                typeof raw === "object" &&
+                raw !== null &&
+                "message" in raw &&
+                typeof (raw as CompletionResponse).message === "string"
+            ) {
+                return (raw as CompletionResponse).message;
+            }
+            throw new Error("Invalid completion response");
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error("Unknown error");
+            console.error("Non-streaming error:", err.message);
+            throw err;
         }
     }
 }
@@ -208,9 +230,20 @@ export function useChatService() {
     const updateChatTitle = useMutation(api.chats.updateChatTitle);
 
     const chatService = ChatService.getInstance();
-    const { setIsStreaming, setStreamingMessage, clearStreamingMessage, addMessage: addMessageToStore, getCurrentChat } = useChatStore();
+    const {
+        setIsStreaming,
+        setStreamingMessage,
+        clearStreamingMessage,
+        addMessage: addMessageToStore,
+        addChat: addChatToStore,
+        getCurrentChat,
+    } = useChatStore();
 
-    const sendMessage = async (content: string, chatId?: Id<"chats">, userId?: Id<"users">) => {
+    const sendMessage = async (
+        content: string,
+        chatId?: Id<"chats">,
+        userId?: Id<"users">
+    ): Promise<Id<"chats">> => {
         try {
             let currentChatId = chatId;
 
@@ -218,10 +251,22 @@ export function useChatService() {
             if (!currentChatId && userId) {
                 const title = content.length > 50 ? content.substring(0, 50) + "..." : content;
                 currentChatId = await createChat({ userId, title });
+
+                // Optimistically add chat to local store so it appears immediately in sidebar
+                if (currentChatId) {
+                    const newChat: Chat = {
+                        _id: currentChatId,
+                        userId,
+                        title,
+                        messages: [],
+                        _creationTime: Date.now(),
+                    };
+                    addChatToStore(newChat);
+                }
             }
 
             if (!currentChatId) {
-                throw new Error("No chat ID available");
+                throw new Error("Chat ID not available");
             }
 
             // Add user message to Convex
@@ -235,53 +280,74 @@ export function useChatService() {
             addMessageToStore(currentChatId, { role: "user", content });
 
             const currentChat = getCurrentChat();
-            const messages = currentChat ? [...currentChat.messages, { role: "user", content }] : [{ role: "user", content }];
+            const messages: Message[] = currentChat ? [...currentChat.messages, { role: "user", content }] : [{ role: "user", content }];
 
             setIsStreaming(true);
             clearStreamingMessage();
 
             let fullResponse = "";
 
-            await chatService.sendMessageCustomStream(
-                messages as Message[],
-                currentChatId,
-                (chunk) => {
-                    setStreamingMessage(fullResponse + chunk);
-                    fullResponse += chunk;
-                },
-                (response) => {
-                    setIsStreaming(false);
-                    clearStreamingMessage();
+            let attempt = 0;
+            const maxAttempts = 3;
 
-                    // Add assistant message to Convex
-                    void addMessage({
-                        chatId: currentChatId,
-                        role: "assistant",
-                        content: response,
-                    });
+            const executeStream = async (): Promise<void> => {
+                try {
+                    await chatService.sendMessageCustomStream(
+                        messages,
+                        currentChatId,
+                        (chunk) => {
+                            setStreamingMessage(fullResponse + chunk);
+                            fullResponse += chunk;
 
-                    // Add assistant message to store
-                    addMessageToStore(currentChatId, { role: "assistant", content: response });
-                },
-                (error) => {
-                    setIsStreaming(false);
-                    clearStreamingMessage();
-                    console.error("Chat error:", error);
-
-                    // Add error message to store
-                    addMessageToStore(currentChatId, {
-                        role: "assistant",
-                        content: `Error: ${error}`,
-                    });
+                            // Persist partial content
+                            const sanitized: Message[] = messages.map((m) => ({ role: m.role, content: m.content }));
+                            void updateMessages({
+                                chatId: currentChatId,
+                                messages: [...sanitized, { role: "assistant", content: fullResponse }],
+                            });
+                        },
+                        (response) => {
+                            setIsStreaming(false);
+                            clearStreamingMessage();
+                            void addMessage({ chatId: currentChatId, role: "assistant", content: response });
+                            addMessageToStore(currentChatId, { role: "assistant", content: response });
+                        },
+                        (error: string) => {
+                            console.error("Stream error:", error);
+                            attempt += 1;
+                            if (attempt < maxAttempts) {
+                                const backoffMs = 1000 * attempt;
+                                console.info(`Retrying stream in ${backoffMs}ms (attempt ${attempt + 1}/${maxAttempts})...`);
+                                setTimeout(() => {
+                                    void executeStream();
+                                }, backoffMs);
+                            } else {
+                                setIsStreaming(false);
+                                clearStreamingMessage();
+                                addMessageToStore(currentChatId, {
+                                    role: "assistant",
+                                    content: `Error after ${maxAttempts} attempts: ${error}`,
+                                });
+                            }
+                        }
+                    );
+                } catch (err: unknown) {
+                    console.error(
+                        "executeStream error",
+                        err instanceof Error ? err.message : err
+                    );
                 }
-            );
+            };
+
+            await executeStream();
 
             return currentChatId;
-        } catch (error) {
+        } catch (error: unknown) {
             setIsStreaming(false);
             clearStreamingMessage();
-            console.error("Send message error:", error);
-            throw error;
+            const message = error instanceof Error ? error.message : "Unknown error";
+            console.error("Send message error:", message);
+            throw new Error(message);
         }
     };
 
@@ -293,3 +359,14 @@ export function useChatService() {
         chatService,
     };
 }
+
+const isStreamingResponse = (value: unknown): value is StreamingResponse => {
+    if (typeof value !== "object" || value === null) return false;
+    const t = (value as StreamingResponse).type;
+    return t === "start" || t === "delta" || t === "complete" || t === "error";
+};
+
+const isOpenAIStreamResponse = (value: unknown): value is OpenAIStreamResponse => {
+    if (typeof value !== "object" || value === null) return false;
+    return Array.isArray((value as OpenAIStreamResponse).choices);
+};

@@ -9,7 +9,7 @@ interface Message {
     isStreaming?: boolean;
 }
 
-interface Chat {
+export interface Chat {
     _id: Id<"chats">;
     userId: Id<"users">;
     title: string;

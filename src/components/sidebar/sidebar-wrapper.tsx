@@ -1,4 +1,5 @@
 import Navbar from "@/components/sidebar/navbar";
+import { NavChats } from "@/components/sidebar/nav-chats";
 import { SidebarHeader as Header } from "@/components/sidebar/sidebar-header";
 import {
   Sidebar,
@@ -33,8 +34,7 @@ export default function SidebarWrapper({
           <Header />
         </SidebarHeader>
         <SidebarContent>
-          {/* <NavProjects /> */}
-          test
+          <NavChats />
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>

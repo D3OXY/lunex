@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./functions";
 import { ConvexError } from "convex/values";
+import { getUserOrThrow } from "./user";
 
 // Get all chats for a user
 export const getUserChats = query({
@@ -32,6 +33,17 @@ export const createChat = mutation({
         title: v.string(),
     },
     handler: async (ctx, { userId, title }) => {
+        // Ensure the caller is authenticated and matches the supplied userId
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) {
+            throw new ConvexError("Unauthorized");
+        }
+
+        const currentUser = await getUserOrThrow(ctx);
+        if (!currentUser || currentUser._id !== userId) {
+            throw new ConvexError("Forbidden");
+        }
+
         const chatId = await ctx.table("chats").insert({
             userId,
             title,
@@ -53,6 +65,16 @@ export const addMessage = mutation({
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
             throw new ConvexError("Chat not found");
+        }
+
+        // Authorization: allow assistant role or owner user only
+        const identity = await ctx.auth.getUserIdentity();
+        if (role === "user") {
+            if (!identity) throw new ConvexError("Unauthorized");
+            const currentUser = await getUserOrThrow(ctx);
+            if (!currentUser || currentUser._id !== chat.userId) {
+                throw new ConvexError("Forbidden");
+            }
         }
 
         const newMessage = { role, content };
@@ -78,6 +100,12 @@ export const updateChatTitle = mutation({
             throw new ConvexError("Chat not found");
         }
 
+        // Authorization: only owner can rename
+        const currentUser = await getUserOrThrow(ctx);
+        if (!currentUser || currentUser._id !== chat.userId) {
+            throw new ConvexError("Forbidden");
+        }
+
         await ctx.table("chats").getX(chatId).patch({
             title,
         });
@@ -93,6 +121,12 @@ export const deleteChat = mutation({
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
             throw new ConvexError("Chat not found");
+        }
+
+        // Authorization: only owner can delete
+        const currentUser = await getUserOrThrow(ctx);
+        if (!currentUser || currentUser._id !== chat.userId) {
+            throw new ConvexError("Forbidden");
         }
 
         await ctx.table("chats").getX(chatId).delete();
@@ -115,6 +149,11 @@ export const updateMessages = mutation({
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
             throw new ConvexError("Chat not found");
+        }
+
+        const currentUser = await getUserOrThrow(ctx);
+        if (!currentUser || currentUser._id !== chat.userId) {
+            throw new ConvexError("Forbidden");
         }
 
         await ctx.table("chats").getX(chatId).patch({
