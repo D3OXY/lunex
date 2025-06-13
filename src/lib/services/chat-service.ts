@@ -28,10 +28,6 @@ interface OpenAIStreamChoiceDelta {
     content?: string;
 }
 
-interface OpenAIStreamChoice {
-    delta?: OpenAIStreamChoiceDelta;
-}
-
 interface OpenAIStreamResponse {
     choices?: Array<{
         delta?: OpenAIStreamChoiceDelta;
@@ -235,7 +231,6 @@ export class ChatService {
 // Hook for using chat service with Convex integration
 export function useChatService() {
     const createChat = useMutation(api.chats.createChat);
-    const addMessage = useMutation(api.chats.addMessage);
     const updateMessages = useMutation(api.chats.updateMessages);
     const deleteChat = useMutation(api.chats.deleteChat);
     const updateChatTitle = useMutation(api.chats.updateChatTitle);
