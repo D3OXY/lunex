@@ -5,9 +5,6 @@ import { useChatStore, type Chat } from "../stores/chat-store";
 
 type Role = "user" | "assistant";
 
-const isRole = (value: unknown): value is Role =>
-    value === "user" || value === "assistant";
-
 interface Message {
     role: Role;
     content: string;
@@ -100,14 +97,14 @@ export class ChatService {
                         }
 
                         try {
-                            const parsed: OpenAIStreamResponse = JSON.parse(data);
-                            if (parsed.choices?.[0]?.delta?.content) {
-                                const content = parsed.choices[0].delta.content;
+                            const parsedUnknown = JSON.parse(data) as unknown;
+                            if (isOpenAIStreamResponse(parsedUnknown) && parsedUnknown.choices?.[0]?.delta?.content) {
+                                const content = parsedUnknown.choices[0].delta?.content ?? "";
                                 fullResponse += content;
                                 onStream?.(content);
                             }
-                        } catch (e) {
-                            // Ignore parsing errors for individual chunks
+                        } catch {
+                            // Silent JSON parse error – ignore malformed chunk
                         }
                     }
                 }
@@ -158,26 +155,29 @@ export class ChatService {
 
                 for (const line of lines) {
                     try {
-                        const data: StreamingResponse = JSON.parse(line);
+                        const parsedUnknown = JSON.parse(line) as unknown;
+                        if (!isStreamingResponse(parsedUnknown)) {
+                            continue;
+                        }
 
-                        switch (data.type) {
+                        switch (parsedUnknown.type) {
                             case "start":
                                 // Initialize streaming
                                 break;
                             case "delta":
-                                if (data.content) {
-                                    fullResponse += data.content;
-                                    onStream?.(data.content);
+                                if (parsedUnknown.content) {
+                                    fullResponse += parsedUnknown.content;
+                                    onStream?.(parsedUnknown.content);
                                 }
                                 break;
                             case "complete":
                                 onComplete?.(fullResponse);
                                 return;
                             case "error":
-                                onError?.(data.error ?? "Unknown error");
+                                onError?.(parsedUnknown.error ?? "Unknown error");
                                 return;
                         }
-                    } catch (e) {
+                    } catch {
                         // Ignore parsing errors for individual chunks
                     }
                 }
@@ -360,10 +360,13 @@ export function useChatService() {
     };
 }
 
-const sleep = (ms: number): Promise<void> => new Promise((res) => setTimeout(res, ms));
-
 const isStreamingResponse = (value: unknown): value is StreamingResponse => {
     if (typeof value !== "object" || value === null) return false;
     const t = (value as StreamingResponse).type;
     return t === "start" || t === "delta" || t === "complete" || t === "error";
+};
+
+const isOpenAIStreamResponse = (value: unknown): value is OpenAIStreamResponse => {
+    if (typeof value !== "object" || value === null) return false;
+    return Array.isArray((value as OpenAIStreamResponse).choices);
 };
