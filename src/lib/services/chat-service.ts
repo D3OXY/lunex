@@ -293,7 +293,7 @@ export function useChatService() {
             const executeStream = async (): Promise<void> => {
                 try {
                     await chatService.sendMessageCustomStream(
-                        messages as Message[],
+                        messages,
                         currentChatId,
                         (chunk) => {
                             setStreamingMessage(fullResponse + chunk);
