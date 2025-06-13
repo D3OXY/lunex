@@ -80,6 +80,8 @@ export class ChatService {
 
             const decoder = new TextDecoder();
             let fullResponse = "";
+            let lastUpdate = Date.now();
+            const UPDATE_INTERVAL_MS = 50;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -102,6 +104,12 @@ export class ChatService {
                                 const content = parsedUnknown.choices[0].delta?.content ?? "";
                                 fullResponse += content;
                                 onStream?.(content);
+
+                                // Throttle updates internally in sendMessage (if onStream consumer implements own buffering)
+                                const now = Date.now();
+                                if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
+                                    lastUpdate = now;
+                                }
                             }
                         } catch {
                             // Silent JSON parse error – ignore malformed chunk
@@ -145,6 +153,8 @@ export class ChatService {
 
             const decoder = new TextDecoder();
             let fullResponse = "";
+            let lastUpdate = Date.now();
+            const UPDATE_INTERVAL_MS = 50;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -168,6 +178,12 @@ export class ChatService {
                                 if (parsedUnknown.content) {
                                     fullResponse += parsedUnknown.content;
                                     onStream?.(parsedUnknown.content);
+
+                                    // Throttle updates time tracking within internal stream
+                                    const now = Date.now();
+                                    if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
+                                        lastUpdate = now;
+                                    }
                                 }
                                 break;
                             case "complete":
@@ -271,6 +287,8 @@ export function useChatService() {
             setIsStreaming(true);
 
             let fullResponse = "";
+            let lastUpdate = Date.now();
+            const UPDATE_INTERVAL_MS = 50;
 
             let attempt = 0;
             const maxAttempts = 3;
@@ -283,8 +301,11 @@ export function useChatService() {
                         (chunk) => {
                             fullResponse += chunk;
 
-                            // Update the placeholder message locally for smooth streaming
-                            updateMessage(currentChatId, assistantIndex, fullResponse);
+                            // Throttle updates internally in sendMessage (if onStream consumer implements own buffering)
+                            const now = Date.now();
+                            if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
+                                lastUpdate = now;
+                            }
 
                             // Persist partial content
                             const sanitized: Message[] = baseMessages.map((m) => ({ role: m.role, content: m.content }));
