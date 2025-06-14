@@ -83,7 +83,7 @@ export default function Home(): React.JSX.Element {
                             chatId={null}
                             disabled={false}
                             onSubmit={() => {
-                                console.log("submit");
+                                console.info("submit");
                             }}
                         />
                     </div>

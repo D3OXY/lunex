@@ -22,7 +22,7 @@ export const clerkUserWebhookHandler = httpAction(async (ctx, request) => {
             break;
         }
         default:
-            console.log("Ignored Clerk webhook event", event.type);
+            console.info("Ignored Clerk webhook event", event.type);
     }
 
     return new Response(null, { status: 200 });

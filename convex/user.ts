@@ -21,7 +21,6 @@ export const current = query({
 export const upsertFromClerk = internalMutation({
     args: { data: v.any() as Validator<UserJSON> }, // no runtime validation, trust Clerk
     async handler(ctx, { data }) {
-        console.log("upsertFromClerk");
         const primaryEmail = data.email_addresses.find((email) => email.id === data.primary_email_address_id);
         if (!primaryEmail) {
             throw new Error("Primary email not found");

@@ -154,7 +154,7 @@ const components: Options["components"] = {
                             )}
                         </CodeBlockSelectContent>
                     </CodeBlockSelect>
-                    <CodeBlockCopyButton onCopy={() => console.log("Copied code to clipboard")} onError={() => console.error("Failed to copy code to clipboard")} />
+                    <CodeBlockCopyButton onCopy={() => console.info("Copied code to clipboard")} onError={() => console.error("Failed to copy code to clipboard")} />
                 </CodeBlockHeader>
                 <CodeBlockBody>
                     {(item) => (
