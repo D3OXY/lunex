@@ -58,3 +58,19 @@ export const MODELS = {
         },
     },
 } as const;
+
+type ModelDefinition = (typeof MODELS)[keyof typeof MODELS];
+
+export const getModelsByProvider = () => {
+    const modelsByProvider: Record<string, Record<string, ModelDefinition>> = {};
+    for (const modelId in MODELS) {
+        const model = MODELS[modelId as keyof typeof MODELS];
+        let providerModels = modelsByProvider[model.provider];
+        if (!providerModels) {
+            providerModels = {};
+            modelsByProvider[model.provider] = providerModels;
+        }
+        providerModels[modelId] = model;
+    }
+    return modelsByProvider;
+};
