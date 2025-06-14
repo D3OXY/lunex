@@ -29,6 +29,15 @@ export const MODELS = {
             thinking: true,
         },
     },
+    "google/gemini-2.5-pro-exp-03-25": {
+        name: "Gemini 2.5 Pro Exp 03-25",
+        provider: "Google",
+        features: {
+            imageInput: true,
+            thinking: true,
+            free: true,
+        },
+    },
     "qwen/qwen2.5-vl-72b-instruct:free": {
         name: "Qwen 2.5 VL 72B Instruct",
         provider: "Qwen",
@@ -53,6 +62,13 @@ export const MODELS = {
     "deepseek/deepseek-r1-0528:free": {
         name: "DeepSeek R1 0528",
         provider: "DeepSeek",
+        features: {
+            free: true,
+        },
+    },
+    "google/gemma-3-1b-it:free": {
+        name: "Gemma 3 1B",
+        provider: "Google",
         features: {
             free: true,
         },

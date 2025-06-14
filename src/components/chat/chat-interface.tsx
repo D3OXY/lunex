@@ -13,16 +13,16 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { AIBranch, AIBranchMessages, AIBranchNext, AIBranchPage, AIBranchPrevious, AIBranchSelector } from "@/components/ui/kibo-ui/ai/branch";
 import {
     AIInput,
-    AIInputSubmit,
-    AIInputTextarea,
-    AIInputToolbar,
+    AIInputButton,
     AIInputModelSelect,
     AIInputModelSelectContent,
     AIInputModelSelectItem,
     AIInputModelSelectTrigger,
     AIInputModelSelectValue,
+    AIInputSubmit,
+    AIInputTextarea,
+    AIInputToolbar,
     AIInputTools,
-    AIInputButton,
 } from "@/components/ui/kibo-ui/ai/input";
 import { AIMessage, AIMessageAvatar, AIMessageContent } from "@/components/ui/kibo-ui/ai/message";
 import { AIResponse } from "@/components/ui/kibo-ui/ai/response";
@@ -30,9 +30,9 @@ import { AIResponse } from "@/components/ui/kibo-ui/ai/response";
 // UI Components
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SelectGroup, SelectLabel } from "@/components/ui/select";
-import { SendIcon, PlusIcon, MicIcon, GlobeIcon, Image, Brain, Sparkles } from "lucide-react";
 import type { ModelDefinition, ModelFeatures } from "@/lib/models";
-import { MODELS, getModelsByProvider } from "@/lib/models";
+import { getModelsByProvider } from "@/lib/models";
+import { Brain, GlobeIcon, ImageIcon, MicIcon, PlusIcon, SendIcon, Sparkles } from "lucide-react";
 
 interface ChatInterfaceProps {
     chatId?: Id<"chats">;
@@ -243,7 +243,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                                         <AIInputModelSelectItem key={modelId} value={modelId}>
                                                             <div className="flex items-center gap-2">
                                                                 {model.name}
-                                                                {features.imageInput && <Image size={14} className="text-muted-foreground" />}
+                                                                {features.imageInput && <ImageIcon size={14} className="text-muted-foreground" />}
                                                                 {features.thinking && <Brain size={14} className="text-muted-foreground" />}
                                                                 {features.free && <Sparkles size={14} className="text-muted-foreground" />}
                                                             </div>
