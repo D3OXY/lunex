@@ -59,7 +59,17 @@ export const MODELS = {
     },
 } as const;
 
-type ModelDefinition = (typeof MODELS)[keyof typeof MODELS];
+export type ModelFeatures = {
+    imageInput?: boolean;
+    thinking?: boolean;
+    free?: boolean;
+};
+
+export type ModelDefinition = {
+    name: string;
+    provider: string;
+    features?: ModelFeatures;
+};
 
 export const getModelsByProvider = () => {
     const modelsByProvider: Record<string, Record<string, ModelDefinition>> = {};

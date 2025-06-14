@@ -29,7 +29,9 @@ import { AIResponse } from "@/components/ui/kibo-ui/ai/response";
 
 // UI Components
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SelectGroup, SelectLabel } from "@/components/ui/select";
 import { SendIcon, PlusIcon, MicIcon, GlobeIcon, Image, Brain, Sparkles } from "lucide-react";
+import type { ModelDefinition, ModelFeatures } from "@/lib/models";
 import { MODELS, getModelsByProvider } from "@/lib/models";
 
 interface ChatInterfaceProps {
@@ -42,10 +44,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const [inputKey, setInputKey] = useState(0);
     const modelsByProvider = getModelsByProvider();
 
-    const initialProvider = Object.keys(modelsByProvider)[0] ?? "";
-    const [selectedProvider, setSelectedProvider] = useState<string>(initialProvider);
-
-    const initialModel = Object.keys(modelsByProvider[initialProvider] ?? {})[0] ?? "";
+    const initialModel = Object.keys(Object.values(modelsByProvider)[0] ?? {})[0] ?? "";
     const [selectedModel, setSelectedModel] = useState<string>(initialModel);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -230,44 +229,28 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                     <GlobeIcon size={16} />
                                     <span>Search</span>
                                 </AIInputButton>
-                                <AIInputModelSelect
-                                    value={selectedProvider}
-                                    onValueChange={(value) => {
-                                        setSelectedProvider(value);
-                                        // Set the selected model to the first one of the new provider
-                                        const firstModelOfNewProvider = Object.keys(modelsByProvider[value] ?? {})[0];
-                                        if (firstModelOfNewProvider) {
-                                            setSelectedModel(firstModelOfNewProvider);
-                                        } else {
-                                            setSelectedModel(""); // Clear model if no models for provider
-                                        }
-                                    }}
-                                >
-                                    <AIInputModelSelectTrigger>
-                                        <AIInputModelSelectValue placeholder="Select a provider" />
-                                    </AIInputModelSelectTrigger>
-                                    <AIInputModelSelectContent>
-                                        {Object.keys(modelsByProvider).map((providerName) => (
-                                            <AIInputModelSelectItem key={providerName} value={providerName}>
-                                                {providerName}
-                                            </AIInputModelSelectItem>
-                                        ))}
-                                    </AIInputModelSelectContent>
-                                </AIInputModelSelect>
                                 <AIInputModelSelect value={selectedModel} onValueChange={setSelectedModel}>
                                     <AIInputModelSelectTrigger>
                                         <AIInputModelSelectValue placeholder="Select a model" />
                                     </AIInputModelSelectTrigger>
                                     <AIInputModelSelectContent>
-                                        {Object.entries(modelsByProvider[selectedProvider] ?? {}).map(([id, model]) => (
-                                            <AIInputModelSelectItem key={id} value={id}>
-                                                <div className="flex items-center gap-2">
-                                                    {model.name}
-                                                    {model.features.imageInput && <Image size={14} className="text-muted-foreground" />}
-                                                    {model.features.thinking && <Brain size={14} className="text-muted-foreground" />}
-                                                    {model.features.free && <Sparkles size={14} className="text-muted-foreground" />}
-                                                </div>
-                                            </AIInputModelSelectItem>
+                                        {Object.entries(modelsByProvider).map(([providerName, modelsInProvider]) => (
+                                            <SelectGroup key={providerName}>
+                                                <SelectLabel>{providerName}</SelectLabel>
+                                                {Object.entries(modelsInProvider).map(([modelId, model]: [string, ModelDefinition]) => {
+                                                    const features: ModelFeatures = model.features ?? {};
+                                                    return (
+                                                        <AIInputModelSelectItem key={modelId} value={modelId}>
+                                                            <div className="flex items-center gap-2">
+                                                                {model.name}
+                                                                {features.imageInput && <Image size={14} className="text-muted-foreground" />}
+                                                                {features.thinking && <Brain size={14} className="text-muted-foreground" />}
+                                                                {features.free && <Sparkles size={14} className="text-muted-foreground" />}
+                                                            </div>
+                                                        </AIInputModelSelectItem>
+                                                    );
+                                                })}
+                                            </SelectGroup>
                                         ))}
                                     </AIInputModelSelectContent>
                                 </AIInputModelSelect>
