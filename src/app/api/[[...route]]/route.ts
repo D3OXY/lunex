@@ -69,76 +69,6 @@ const SYSTEM_PROMPT =
 
 // Chat streaming endpoint with OpenRouter
 app.post("/chat/stream", async (c) => {
-    try {
-        const body: { messages?: Array<{ role: string; content: string }>; chatId?: string } = await c.req.json();
-        const { messages, chatId } = body;
-
-        if (!messages || !Array.isArray(messages)) {
-            return c.json({ error: "Messages array is required" }, 400);
-        }
-
-        // Prepend system prompt to guide response formatting
-        const coreMessages: CoreMessage[] = [
-            { role: "system", content: SYSTEM_PROMPT },
-            ...messages.map((msg) => ({
-                role: msg.role as "user" | "assistant" | "system",
-                content: msg.content,
-            })),
-        ];
-
-        const result = await streamText({
-            model: openrouter("google/gemini-2.0-flash-001"),
-            messages: coreMessages,
-            onFinish({ text, usage }) {
-                console.log("Stream finished:", { text, usage, chatId });
-            },
-        });
-
-        return result.toDataStreamResponse();
-    } catch (error) {
-        console.error("Chat streaming error:", error);
-        return c.json({ error: "Internal server error" }, 500);
-    }
-});
-
-// Chat completion endpoint (non-streaming)
-app.post("/chat/completion", async (c) => {
-    try {
-        const body: { messages?: Array<{ role: string; content: string }>; chatId?: string } = await c.req.json();
-        const { messages } = body;
-
-        if (!messages || !Array.isArray(messages)) {
-            return c.json({ error: "Messages array is required" }, 400);
-        }
-
-        // Prepend system prompt
-        const coreMessages: CoreMessage[] = [
-            { role: "system", content: SYSTEM_PROMPT },
-            ...messages.map((msg) => ({
-                role: msg.role as "user" | "assistant" | "system",
-                content: msg.content,
-            })),
-        ];
-
-        const result = await streamText({
-            model: openrouter("google/gemini-2.0-flash-001"),
-            messages: coreMessages,
-        });
-
-        const completion = await result.text;
-
-        return c.json({
-            message: completion,
-            usage: result.usage,
-        });
-    } catch (error) {
-        console.error("Chat completion error:", error);
-        return c.json({ error: "Internal server error" }, 500);
-    }
-});
-
-// Custom streaming endpoint for more control
-app.post("/chat/custom-stream", async (c) => {
     const body: { messages?: Array<{ role: string; content: string }>; chatId?: string } = await c.req.json();
     const { messages, chatId } = body;
 
@@ -197,6 +127,42 @@ app.post("/chat/custom-stream", async (c) => {
             );
         }
     });
+});
+
+// Chat completion endpoint (non-streaming)
+app.post("/chat/completion", async (c) => {
+    try {
+        const body: { messages?: Array<{ role: string; content: string }>; chatId?: string } = await c.req.json();
+        const { messages } = body;
+
+        if (!messages || !Array.isArray(messages)) {
+            return c.json({ error: "Messages array is required" }, 400);
+        }
+
+        // Prepend system prompt
+        const coreMessages: CoreMessage[] = [
+            { role: "system", content: SYSTEM_PROMPT },
+            ...messages.map((msg) => ({
+                role: msg.role as "user" | "assistant" | "system",
+                content: msg.content,
+            })),
+        ];
+
+        const result = await streamText({
+            model: openrouter("google/gemini-2.0-flash-001"),
+            messages: coreMessages,
+        });
+
+        const completion = await result.text;
+
+        return c.json({
+            message: completion,
+            usage: result.usage,
+        });
+    } catch (error) {
+        console.error("Chat completion error:", error);
+        return c.json({ error: "Internal server error" }, 500);
+    }
 });
 
 // Create chat

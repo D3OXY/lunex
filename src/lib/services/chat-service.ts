@@ -24,16 +24,6 @@ interface StreamingResponse {
     error?: string;
 }
 
-interface OpenAIStreamChoiceDelta {
-    content?: string;
-}
-
-interface OpenAIStreamResponse {
-    choices?: Array<{
-        delta?: OpenAIStreamChoiceDelta;
-    }>;
-}
-
 interface CompletionResponse {
     message: string;
     usage?: Usage;
@@ -58,79 +48,6 @@ export class ChatService {
     ): Promise<void> {
         try {
             const response = await fetch("/api/chat/stream", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ messages, chatId }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const reader = response.body?.getReader();
-            if (!reader) {
-                throw new Error("Response body is not readable");
-            }
-
-            const decoder = new TextDecoder();
-            let fullResponse = "";
-            let lastUpdate = Date.now();
-            const UPDATE_INTERVAL_MS = 50;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value);
-                const lines = chunk.split("\n").filter((line) => line.trim());
-
-                for (const line of lines) {
-                    if (line.startsWith("data: ")) {
-                        const data = line.slice(6);
-                        if (data === "[DONE]") {
-                            onComplete?.(fullResponse);
-                            return;
-                        }
-
-                        try {
-                            const parsedUnknown = JSON.parse(data) as unknown;
-                            if (isOpenAIStreamResponse(parsedUnknown) && parsedUnknown.choices?.[0]?.delta?.content) {
-                                const content = parsedUnknown.choices[0].delta?.content ?? "";
-                                fullResponse += content;
-                                onStream?.(content);
-
-                                // Throttle updates internally in sendMessage (if onStream consumer implements own buffering)
-                                const now = Date.now();
-                                if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
-                                    lastUpdate = now;
-                                }
-                            }
-                        } catch {
-                            // Silent JSON parse error – ignore malformed chunk
-                        }
-                    }
-                }
-            }
-
-            onComplete?.(fullResponse);
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : "Unknown error";
-            console.error("Streaming error:", message);
-            onError?.(message);
-        }
-    }
-
-    async sendMessageCustomStream(
-        messages: Message[],
-        chatId: Id<"chats">,
-        onStream?: (content: string) => void,
-        onComplete?: (fullResponse: string) => void,
-        onError?: (error: string) => void
-    ): Promise<void> {
-        try {
-            const response = await fetch("/api/chat/custom-stream", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -290,7 +207,7 @@ export function useChatService() {
 
             const executeStream = async (): Promise<void> => {
                 try {
-                    await chatService.sendMessageCustomStream(
+                    await chatService.sendMessage(
                         messages,
                         currentChatId,
                         (chunk) => {
@@ -358,9 +275,4 @@ const isStreamingResponse = (value: unknown): value is StreamingResponse => {
     if (typeof value !== "object" || value === null) return false;
     const t = (value as StreamingResponse).type;
     return t === "start" || t === "delta" || t === "complete" || t === "error";
-};
-
-const isOpenAIStreamResponse = (value: unknown): value is OpenAIStreamResponse => {
-    if (typeof value !== "object" || value === null) return false;
-    return Array.isArray((value as OpenAIStreamResponse).choices);
 };
