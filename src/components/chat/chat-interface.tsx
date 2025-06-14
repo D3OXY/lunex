@@ -13,6 +13,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { AIBranch, AIBranchMessages, AIBranchNext, AIBranchPage, AIBranchPrevious, AIBranchSelector } from "@/components/ui/kibo-ui/ai/branch";
 import { AIMessage, AIMessageAvatar, AIMessageContent } from "@/components/ui/kibo-ui/ai/message";
 import { AIResponse } from "@/components/ui/kibo-ui/ai/response";
+import { ReasoningDisplay } from "@/components/reasoning-display";
 
 // UI Components
 import { ChatInput } from "@/components/chat/chat-input";
@@ -71,12 +72,18 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         setIsSubmitting(true);
         setQuery("");
         try {
-            const newChatId = await sendMessage(query.trim(), selectedModel, chatId, currentUser._id);
-
-            // If we are on the root path (starting a brand-new chat), redirect to the new chat route
-            if (!chatId && newChatId) {
-                void navigate(`/chat/${newChatId}`);
-            }
+            const newChatId = await sendMessage(
+                query.trim(),
+                selectedModel,
+                chatId,
+                currentUser._id,
+                // Callback for immediate navigation when creating new chat
+                !chatId
+                    ? (createdChatId) => {
+                          void navigate(`/chat/${createdChatId}`);
+                      }
+                    : undefined
+            );
         } catch (error) {
             console.error("Failed to send message:", error);
         } finally {
@@ -112,6 +119,9 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                                 name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "T3"}
                                             />
                                             <AIMessageContent>
+                                                {msg.role === "assistant" && msg.reasoning && (
+                                                    <ReasoningDisplay reasoning={msg.reasoning} isStreaming={msg.isStreaming && isStreaming} />
+                                                )}
                                                 {msg.role === "assistant" ? (
                                                     <AIResponse className="tracking-wide">{msg.content}</AIResponse>
                                                 ) : (

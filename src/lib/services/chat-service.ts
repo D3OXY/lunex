@@ -9,9 +9,10 @@ interface Message {
 }
 
 interface StreamingResponse {
-    type: "start" | "delta" | "complete" | "error";
+    type: "start" | "delta" | "reasoning" | "complete" | "error";
     content?: string;
     error?: string;
+    supportsReasoning?: boolean;
 }
 
 const UPDATE_INTERVAL_MS = 50;
@@ -20,7 +21,7 @@ const MAX_RETRY_ATTEMPTS = 3;
 const isStreamingResponse = (value: unknown): value is StreamingResponse => {
     if (typeof value !== "object" || value === null) return false;
     const t = (value as StreamingResponse).type;
-    return t === "start" || t === "delta" || t === "complete" || t === "error";
+    return t === "start" || t === "delta" || t === "reasoning" || t === "complete" || t === "error";
 };
 
 const streamChatResponse = async (
@@ -28,6 +29,7 @@ const streamChatResponse = async (
     chatId: Id<"chats">,
     modelId: string,
     onStream?: (content: string) => void,
+    onReasoning?: (content: string) => void,
     onComplete?: (fullResponse: string) => void,
     onError?: (error: string) => void
 ): Promise<void> => {
@@ -48,6 +50,7 @@ const streamChatResponse = async (
 
     const decoder = new TextDecoder();
     let fullResponse = "";
+    let supportsReasoning = false;
 
     while (true) {
         const { done, value } = await reader.read();
@@ -62,10 +65,18 @@ const streamChatResponse = async (
                 if (!isStreamingResponse(parsed)) continue;
 
                 switch (parsed.type) {
+                    case "start":
+                        supportsReasoning = Boolean(parsed.supportsReasoning);
+                        break;
                     case "delta":
                         if (parsed.content) {
                             fullResponse += parsed.content;
                             onStream?.(parsed.content);
+                        }
+                        break;
+                    case "reasoning":
+                        if (parsed.content && supportsReasoning) {
+                            onReasoning?.(parsed.content);
                         }
                         break;
                     case "complete":
@@ -87,7 +98,7 @@ export function useChatService() {
     const updateMessages = useMutation(api.chats.updateMessages);
     const deleteChat = useMutation(api.chats.deleteChat);
 
-    const { setIsStreaming, addMessage: addMessageToStore, updateMessage, addChat: addChatToStore, getCurrentChat, setCurrentChatId } = useChatStore();
+    const { setIsStreaming, addMessage: addMessageToStore, updateMessage, updateMessageReasoning, addChat: addChatToStore, getCurrentChat, setCurrentChatId } = useChatStore();
 
     const sendMessage = async (
         content: string,
@@ -158,6 +169,9 @@ export function useChatService() {
                             updateMessage(currentChatId, assistantIndex, fullResponse);
                             lastUpdate = now;
                         }
+                    },
+                    (reasoning: string) => {
+                        updateMessageReasoning(currentChatId, assistantIndex, reasoning);
                     },
                     (response) => {
                         setIsStreaming(false);

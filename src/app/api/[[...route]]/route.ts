@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/await-thenable */
 import { env } from "@/env";
-import { MODELS } from "@/lib/models";
+import { MODELS, type ModelFeatures } from "@/lib/models";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { streamText, type CoreMessage } from "ai";
 import { Hono } from "hono";
@@ -59,22 +59,43 @@ app.post("/chat/stream", async (c) => {
                 throw new Error("Invalid model id");
             }
 
+            // Check if model supports reasoning
+            const modelConfig = MODELS[modelId as keyof typeof MODELS];
+            const supportsReasoning = Boolean((modelConfig?.features as ModelFeatures)?.reasoning);
+
             const result = await streamText({
-                model: openrouter(modelId),
+                model: openrouter(modelId, supportsReasoning ? { includeReasoning: true } : {}),
                 messages: coreMessages,
             });
 
             // Send initial response
-            await stream.write(JSON.stringify({ type: "start", chatId }) + "\n");
+            await stream.write(JSON.stringify({ type: "start", chatId, supportsReasoning }) + "\n");
 
-            // Stream the response
-            for await (const delta of result.textStream) {
-                await stream.write(
-                    JSON.stringify({
-                        type: "delta",
-                        content: delta,
-                    }) + "\n"
-                );
+            // Stream the response using AI SDK's built-in reasoning support
+            for await (const part of result.fullStream) {
+                switch (part.type) {
+                    case "text-delta":
+                        await stream.write(
+                            JSON.stringify({
+                                type: "delta",
+                                content: part.textDelta,
+                            }) + "\n"
+                        );
+                        break;
+                    case "reasoning":
+                        if (supportsReasoning) {
+                            await stream.write(
+                                JSON.stringify({
+                                    type: "reasoning",
+                                    content: part.textDelta,
+                                }) + "\n"
+                            );
+                        }
+                        break;
+                    case "finish":
+                        // Stream is complete
+                        break;
+                }
             }
 
             // Send completion

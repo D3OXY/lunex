@@ -5,6 +5,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 interface Message {
     role: "user" | "assistant";
     content: string;
+    reasoning?: string;
     id?: string;
     isStreaming?: boolean;
 }
@@ -40,6 +41,7 @@ interface ChatState {
     // Message actions
     addMessage: (chatId: Id<"chats">, message: Message) => void;
     updateMessage: (chatId: Id<"chats">, messageIndex: number, content: string) => void;
+    updateMessageReasoning: (chatId: Id<"chats">, messageIndex: number, reasoning: string) => void;
     setIsStreaming: (isStreaming: boolean) => void;
     setStreamingMessage: (message: string) => void;
     clearStreamingMessage: () => void;
@@ -126,6 +128,18 @@ export const useChatStore = create<ChatState>()(
                         ? {
                               ...chat,
                               messages: chat.messages.map((msg, index) => (index === messageIndex ? { ...msg, content } : msg)),
+                          }
+                        : chat
+                ),
+            })),
+
+        updateMessageReasoning: (chatId, messageIndex, reasoning) =>
+            set((state) => ({
+                chats: state.chats.map((chat) =>
+                    chat._id === chatId
+                        ? {
+                              ...chat,
+                              messages: chat.messages.map((msg, index) => (index === messageIndex ? { ...msg, reasoning: (msg.reasoning ?? "") + reasoning } : msg)),
                           }
                         : chat
                 ),
