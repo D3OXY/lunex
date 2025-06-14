@@ -21,13 +21,15 @@ import {
     AIInputModelSelectItem,
     AIInputModelSelectTrigger,
     AIInputModelSelectValue,
+    AIInputTools,
+    AIInputButton,
 } from "@/components/ui/kibo-ui/ai/input";
 import { AIMessage, AIMessageAvatar, AIMessageContent } from "@/components/ui/kibo-ui/ai/message";
 import { AIResponse } from "@/components/ui/kibo-ui/ai/response";
 
 // UI Components
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SendIcon } from "lucide-react";
+import { SendIcon, PlusIcon, MicIcon, GlobeIcon } from "lucide-react";
 import { MODELS } from "@/lib/models";
 
 interface ChatInterfaceProps {
@@ -210,19 +212,30 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                             maxHeight={200}
                         />
                         <AIInputToolbar>
-                            <div className="flex-1" />
-                            <AIInputModelSelect value={selectedModel} onValueChange={setSelectedModel}>
-                                <AIInputModelSelectTrigger>
-                                    <AIInputModelSelectValue />
-                                </AIInputModelSelectTrigger>
-                                <AIInputModelSelectContent>
-                                    {Object.entries(MODELS).map(([id, model]) => (
-                                        <AIInputModelSelectItem key={id} value={id}>
-                                            {model.name}
-                                        </AIInputModelSelectItem>
-                                    ))}
-                                </AIInputModelSelectContent>
-                            </AIInputModelSelect>
+                            <AIInputTools>
+                                <AIInputButton>
+                                    <PlusIcon size={16} />
+                                </AIInputButton>
+                                <AIInputButton>
+                                    <MicIcon size={16} />
+                                </AIInputButton>
+                                <AIInputButton>
+                                    <GlobeIcon size={16} />
+                                    <span>Search</span>
+                                </AIInputButton>
+                                <AIInputModelSelect value={selectedModel} onValueChange={setSelectedModel}>
+                                    <AIInputModelSelectTrigger>
+                                        <AIInputModelSelectValue />
+                                    </AIInputModelSelectTrigger>
+                                    <AIInputModelSelectContent>
+                                        {Object.entries(MODELS).map(([id, model]) => (
+                                            <AIInputModelSelectItem key={id} value={id}>
+                                                {model.name}
+                                            </AIInputModelSelectItem>
+                                        ))}
+                                    </AIInputModelSelectContent>
+                                </AIInputModelSelect>
+                            </AIInputTools>
                             <AIInputSubmit disabled={!message.trim() || isSubmitting || isStreaming}>
                                 <SendIcon className="h-4 w-4" />
                             </AIInputSubmit>
