@@ -153,7 +153,11 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                                 name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "T3"}
                                             />
                                             <AIMessageContent>
-                                                {msg.role === "assistant" ? <AIResponse>{msg.content}</AIResponse> : <div className="text-sm">{msg.content}</div>}
+                                                {msg.role === "assistant" ? (
+                                                    <AIResponse className="tracking-wide">{msg.content}</AIResponse>
+                                                ) : (
+                                                    <div className="text-base tracking-wide">{msg.content}</div>
+                                                )}
                                                 {msg.isStreaming && isStreaming && (
                                                     <div className="mt-2 flex items-center gap-1">
                                                         <div className="h-2 w-2 animate-pulse rounded-full bg-current" />

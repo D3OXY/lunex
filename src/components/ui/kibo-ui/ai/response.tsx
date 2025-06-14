@@ -30,6 +30,11 @@ export type AIResponseProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 const components: Options["components"] = {
+    p: ({ node, children, className, ...props }) => (
+        <p className={cn("mb-4 text-base leading-relaxed tracking-wide", className)} {...props}>
+            {children}
+        </p>
+    ),
     pre: ({ children }) => <div>{children}</div>,
     ol: ({ node, children, className, ...props }) => (
         <ol className={cn("ml-4 list-outside list-decimal", className)} {...props}>
@@ -91,7 +96,7 @@ const components: Options["components"] = {
         const hasLanguageClass = typeof className === "string" && className.includes("language-");
 
         if (!hasLanguageClass) {
-            return <code className={cn("bg-muted rounded px-1.5 py-0.5 font-mono text-sm", className)}>{children}</code>;
+            return <code className={cn("bg-muted rounded px-1.5 py-0.5 font-mono text-base tracking-wide", className)}>{children}</code>;
         }
 
         // For code blocks (fenced code), render with full CodeBlock component
