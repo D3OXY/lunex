@@ -42,6 +42,7 @@ export class ChatService {
     async sendMessage(
         messages: Message[],
         chatId: Id<"chats">,
+        modelId: string,
         onStream?: (content: string) => void,
         onComplete?: (fullResponse: string) => void,
         onError?: (error: string) => void
@@ -52,7 +53,7 @@ export class ChatService {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ messages, chatId }),
+                body: JSON.stringify({ messages, chatId, modelId }),
             });
 
             if (!response.ok) {
@@ -118,14 +119,14 @@ export class ChatService {
         }
     }
 
-    async sendMessageNonStreaming(messages: Message[], chatId: Id<"chats">): Promise<string> {
+    async sendMessageNonStreaming(messages: Message[], chatId: Id<"chats">, modelId: string): Promise<string> {
         try {
             const response = await fetch("/api/chat/completion", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ messages, chatId }),
+                body: JSON.stringify({ messages, chatId, modelId }),
             });
 
             if (!response.ok) {
@@ -155,7 +156,7 @@ export function useChatService() {
     const chatService = ChatService.getInstance();
     const { setIsStreaming, addMessage: addMessageToStore, updateMessage, addChat: addChatToStore, getCurrentChat } = useChatStore();
 
-    const sendMessage = async (content: string, chatId?: Id<"chats">, userId?: Id<"users">): Promise<Id<"chats">> => {
+    const sendMessage = async (content: string, modelId: string, chatId?: Id<"chats">, userId?: Id<"users">): Promise<Id<"chats">> => {
         try {
             let currentChatId = chatId;
 
@@ -210,7 +211,8 @@ export function useChatService() {
                     await chatService.sendMessage(
                         messages,
                         currentChatId,
-                        (chunk) => {
+                        modelId,
+                        (chunk: string) => {
                             fullResponse += chunk;
 
                             // Throttle updates internally in sendMessage (if onStream consumer implements own buffering)

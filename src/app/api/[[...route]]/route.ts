@@ -1,20 +1,21 @@
 /* eslint-disable @typescript-eslint/await-thenable */
-import { Hono } from "hono";
-import { handle } from "hono/vercel";
-import { stream } from "hono/streaming";
-import { cors } from "hono/cors";
+import { MODELS } from "@/lib/models";
 import { streamText, type CoreMessage } from "ai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { ConvexHttpClient } from "convex/browser";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { stream } from "hono/streaming";
+import { handle } from "hono/vercel";
 import { api as convexApi } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { env } from "@/env";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+
+const openrouter = createOpenRouter({
+    apiKey: env.OPENROUTER_API_KEY,
+});
 
 const app = new Hono().basePath("/api");
-
-// Configure OpenRouter client with environment variable
-const openrouter = createOpenRouter({
-    apiKey: process.env.OPENROUTER_API_KEY ?? "",
-});
 
 // Initialize Convex HTTP client for server-side use
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL ?? "");
@@ -69,8 +70,8 @@ const SYSTEM_PROMPT =
 
 // Chat streaming endpoint with OpenRouter
 app.post("/chat/stream", async (c) => {
-    const body: { messages?: Array<{ role: string; content: string }>; chatId?: string } = await c.req.json();
-    const { messages, chatId } = body;
+    const body: { messages?: Array<{ role: string; content: string }>; chatId?: string; modelId?: string } = await c.req.json();
+    const { messages, chatId, modelId } = body;
 
     return stream(c, async (stream) => {
         try {
@@ -93,8 +94,13 @@ app.post("/chat/stream", async (c) => {
                 })),
             ];
 
+            // check if modelId is a valid model id
+            if (!modelId || !Object.keys(MODELS).includes(modelId)) {
+                throw new Error("Invalid model id");
+            }
+
             const result = await streamText({
-                model: openrouter("google/gemini-2.0-flash-001"),
+                model: openrouter(modelId),
                 messages: coreMessages,
             });
 
@@ -132,8 +138,8 @@ app.post("/chat/stream", async (c) => {
 // Chat completion endpoint (non-streaming)
 app.post("/chat/completion", async (c) => {
     try {
-        const body: { messages?: Array<{ role: string; content: string }>; chatId?: string } = await c.req.json();
-        const { messages } = body;
+        const body: { messages?: Array<{ role: string; content: string }>; chatId?: string; modelId?: string } = await c.req.json();
+        const { messages, modelId } = body;
 
         if (!messages || !Array.isArray(messages)) {
             return c.json({ error: "Messages array is required" }, 400);
@@ -148,8 +154,12 @@ app.post("/chat/completion", async (c) => {
             })),
         ];
 
+        if (!modelId || !Object.keys(MODELS).includes(modelId)) {
+            throw new Error("Invalid model id");
+        }
+
         const result = await streamText({
-            model: openrouter("google/gemini-2.0-flash-001"),
+            model: openrouter(modelId ?? "google/gemini-2.0-flash-001"),
             messages: coreMessages,
         });
 

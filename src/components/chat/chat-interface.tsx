@@ -11,13 +11,24 @@ import type { Id } from "../../../convex/_generated/dataModel";
 
 // AI Components
 import { AIBranch, AIBranchMessages, AIBranchNext, AIBranchPage, AIBranchPrevious, AIBranchSelector } from "@/components/ui/kibo-ui/ai/branch";
-import { AIInput, AIInputSubmit, AIInputTextarea, AIInputToolbar } from "@/components/ui/kibo-ui/ai/input";
+import {
+    AIInput,
+    AIInputSubmit,
+    AIInputTextarea,
+    AIInputToolbar,
+    AIInputModelSelect,
+    AIInputModelSelectContent,
+    AIInputModelSelectItem,
+    AIInputModelSelectTrigger,
+    AIInputModelSelectValue,
+} from "@/components/ui/kibo-ui/ai/input";
 import { AIMessage, AIMessageAvatar, AIMessageContent } from "@/components/ui/kibo-ui/ai/message";
 import { AIResponse } from "@/components/ui/kibo-ui/ai/response";
 
 // UI Components
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SendIcon } from "lucide-react";
+import { MODELS } from "@/lib/models";
 
 interface ChatInterfaceProps {
     chatId?: Id<"chats">;
@@ -27,6 +38,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const [message, setMessage] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [inputKey, setInputKey] = useState(0);
+    const [selectedModel, setSelectedModel] = useState<string>(Object.keys(MODELS)[0] ?? "");
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -97,7 +109,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         setMessage("");
         setInputKey((prev) => prev + 1);
         try {
-            const newChatId = await sendMessage(message.trim(), chatId, currentUser._id);
+            const newChatId = await sendMessage(message.trim(), selectedModel, chatId, currentUser._id);
 
             // If we are on the root path (starting a brand-new chat), redirect to the new chat route
             if (!chatId && newChatId) {
@@ -199,6 +211,18 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                         />
                         <AIInputToolbar>
                             <div className="flex-1" />
+                            <AIInputModelSelect value={selectedModel} onValueChange={setSelectedModel}>
+                                <AIInputModelSelectTrigger>
+                                    <AIInputModelSelectValue />
+                                </AIInputModelSelectTrigger>
+                                <AIInputModelSelectContent>
+                                    {Object.entries(MODELS).map(([id, model]) => (
+                                        <AIInputModelSelectItem key={id} value={id}>
+                                            {model.name}
+                                        </AIInputModelSelectItem>
+                                    ))}
+                                </AIInputModelSelectContent>
+                            </AIInputModelSelect>
                             <AIInputSubmit disabled={!message.trim() || isSubmitting || isStreaming}>
                                 <SendIcon className="h-4 w-4" />
                             </AIInputSubmit>
