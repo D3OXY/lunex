@@ -124,11 +124,24 @@ const components: Options["components"] = {
 
         const fileExtension = languageToFileExtension[language] ?? language;
 
+        // Ensure children is a string and handle undefined/null cases
+        let codeContent = "";
+        if (typeof children === "string") {
+            codeContent = children;
+        } else if (typeof children === "number") {
+            codeContent = children.toString();
+        } else if (Array.isArray(children)) {
+            codeContent = children.join("");
+        } else if (children != null) {
+            // Fallback for other types, but this should rarely happen
+            codeContent = "";
+        }
+
         const data: CodeBlockProps["data"] = [
             {
                 language,
                 filename: `code.${fileExtension}`,
-                code: children as string,
+                code: codeContent,
             },
         ];
 
