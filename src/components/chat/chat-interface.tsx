@@ -192,7 +192,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="Type your message here..."
+                            placeholder="What would you like to know?"
                             disabled={isSubmitting || isStreaming}
                             minHeight={20}
                             maxHeight={200}
