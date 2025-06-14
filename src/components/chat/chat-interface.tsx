@@ -72,7 +72,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         setIsSubmitting(true);
         setQuery("");
         try {
-            const newChatId = await sendMessage(
+            await sendMessage(
                 query.trim(),
                 selectedModel,
                 chatId,
@@ -115,8 +115,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                     allMessages.map((msg, index) => (
                                         <AIMessage key={`${index}-${msg.role}`} from={msg.role}>
                                             <AIMessageAvatar
-                                                src={msg.role === "user" ? (clerkUser?.imageUrl ?? "") : "/neo.png"}
-                                                name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "T3"}
+                                                src={msg.role === "user" ? (clerkUser?.imageUrl ?? "") : ""}
+                                                name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "AI"}
                                             />
                                             <AIMessageContent>
                                                 {msg.role === "assistant" && msg.reasoning && (
