@@ -57,6 +57,7 @@ export const MODELS = {
         provider: "DeepSeek",
         features: {
             free: true,
+            reasoning: true,
         },
     },
     "deepseek/deepseek-r1-0528:free": {
@@ -64,6 +65,7 @@ export const MODELS = {
         provider: "DeepSeek",
         features: {
             free: true,
+            reasoning: true,
         },
     },
     "google/gemma-3-1b-it:free": {
@@ -78,7 +80,6 @@ export const MODELS = {
         provider: "DeepSeek",
         features: {
             free: true,
-            reasoning: true,
         },
     },
 } as const;
