@@ -19,6 +19,8 @@ export interface Chat {
 
 interface ChatState {
     // State
+    query: string;
+    selectedModel: string;
     chats: Chat[];
     currentChatId: Id<"chats"> | null;
     isLoading: boolean;
@@ -26,6 +28,8 @@ interface ChatState {
     streamingMessage: string;
 
     // Actions
+    setQuery: (query: string) => void;
+    setSelectedModel: (model: string) => void;
     setChats: (chats: Chat[]) => void;
     setCurrentChatId: (chatId: Id<"chats"> | null) => void;
     addChat: (chat: Chat) => void;
@@ -47,6 +51,8 @@ interface ChatState {
 export const useChatStore = create<ChatState>()(
     subscribeWithSelector((set, get) => ({
         // Initial state
+        query: "",
+        selectedModel: "google/gemini-2.5-pro-exp-03-25",
         chats: [],
         currentChatId: null,
         isLoading: false,
@@ -54,6 +60,10 @@ export const useChatStore = create<ChatState>()(
         streamingMessage: "",
 
         // Actions
+        setQuery: (query) => set({ query }),
+
+        setSelectedModel: (model) => set({ selectedModel: model }),
+
         setChats: (chats) => set({ chats }),
 
         setCurrentChatId: (chatId) => set({ currentChatId: chatId }),

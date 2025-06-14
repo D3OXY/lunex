@@ -6,15 +6,8 @@ import { SidebarHeader as Header } from "@/components/sidebar/sidebar-header";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider } from "@/components/ui/sidebar";
 import { Settings } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
 
 export default function SidebarWrapper({ children }: { children: React.ReactNode }) {
-    const navigate = useNavigate();
-
-    const handleNewChat = (): void => {
-        void navigate("/");
-    };
-
     return (
         <SidebarProvider
             style={
@@ -29,7 +22,7 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
                     <Header />
                 </SidebarHeader>
                 <SidebarContent>
-                    <NavChats onNewChat={handleNewChat} />
+                    <NavChats />
                 </SidebarContent>
                 <SidebarFooter>
                     <SidebarMenu>

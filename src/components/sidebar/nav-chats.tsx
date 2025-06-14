@@ -6,7 +6,7 @@ import { useChatService } from "@/lib/services/chat-service";
 import type { Chat } from "@/lib/stores/chat-store";
 import { useChats } from "@/lib/stores/chat-store";
 import { cn } from "@/lib/utils";
-import { MessageSquareIcon, PenLine, PlusIcon, SearchIcon, X, XIcon } from "lucide-react";
+import { MessageSquareIcon, PenLine, SearchIcon, X, XIcon } from "lucide-react";
 import type { HTMLAttributes, ReactElement } from "react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -23,7 +23,7 @@ interface GroupedChats {
     older: Chat[];
 }
 
-export const NavChats = ({ className, onNewChat, ...props }: NavChatsProps): ReactElement => {
+export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement => {
     const [searchQuery, setSearchQuery] = useState("");
     const [editingChatId, setEditingChatId] = useState<Id<"chats"> | null>(null);
     const [editTitle, setEditTitle] = useState("");
@@ -227,12 +227,6 @@ export const NavChats = ({ className, onNewChat, ...props }: NavChatsProps): Rea
                         <div className="text-muted-foreground animate-in fade-in-50 flex h-32 flex-col items-center justify-center px-2 duration-300">
                             <MessageSquareIcon className="mb-2 h-6 w-6" />
                             <p className="text-center text-xs">{searchQuery ? "No chats found" : "No chats yet"}</p>
-                            {!searchQuery && onNewChat && (
-                                <Button variant="ghost" size="sm" onClick={onNewChat} className="mt-2 h-7 text-xs transition-all duration-200 hover:scale-105">
-                                    <PlusIcon className="mr-1 h-3 w-3" />
-                                    Start a new chat
-                                </Button>
-                            )}
                         </div>
                     ) : (
                         <div className="space-y-1">

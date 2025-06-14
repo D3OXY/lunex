@@ -11,44 +11,22 @@ import type { Id } from "../../../convex/_generated/dataModel";
 
 // AI Components
 import { AIBranch, AIBranchMessages, AIBranchNext, AIBranchPage, AIBranchPrevious, AIBranchSelector } from "@/components/ui/kibo-ui/ai/branch";
-import {
-    AIInput,
-    AIInputButton,
-    AIInputModelSelect,
-    AIInputModelSelectContent,
-    AIInputModelSelectItem,
-    AIInputModelSelectTrigger,
-    AIInputModelSelectValue,
-    AIInputSubmit,
-    AIInputTextarea,
-    AIInputToolbar,
-    AIInputTools,
-} from "@/components/ui/kibo-ui/ai/input";
 import { AIMessage, AIMessageAvatar, AIMessageContent } from "@/components/ui/kibo-ui/ai/message";
 import { AIResponse } from "@/components/ui/kibo-ui/ai/response";
 
 // UI Components
+import { ChatInput } from "@/components/chat/chat-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SelectGroup, SelectLabel } from "@/components/ui/select";
-import type { ModelDefinition, ModelFeatures } from "@/lib/models";
-import { getModelsByProvider } from "@/lib/models";
-import { Brain, GlobeIcon, ImageIcon, MicIcon, PlusIcon, SendIcon, Sparkles } from "lucide-react";
 
 interface ChatInterfaceProps {
     chatId?: Id<"chats">;
 }
 
 export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element {
-    const [message, setMessage] = useState("");
+    const { query, setQuery, selectedModel } = useChatStore();
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [inputKey, setInputKey] = useState(0);
-    const modelsByProvider = getModelsByProvider();
-
-    const initialModel = Object.keys(Object.values(modelsByProvider)[0] ?? {})[0] ?? "";
-    const [selectedModel, setSelectedModel] = useState<string>(initialModel);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Store hooks
     const { setCurrentChatId, setChats } = useChatStore();
@@ -86,38 +64,14 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [currentChat?.messages, isStreaming]);
 
-    // Auto-focus input when user starts typing
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Don't interfere if user is already typing in an input/textarea or if modifiers are pressed
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.ctrlKey || e.metaKey || e.altKey || isSubmitting || isStreaming) {
-                return;
-            }
-
-            // Only handle printable characters (letters, numbers, symbols, space)
-            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                e.preventDefault();
-                setMessage((prev) => prev + e.key);
-                // Focus the textarea after state update
-                setTimeout(() => {
-                    textareaRef.current?.focus();
-                }, 0);
-            }
-        };
-
-        document.addEventListener("keydown", handleKeyDown);
-        return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [isSubmitting, isStreaming]);
-
     const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
-        if (!message.trim() || isSubmitting || !currentUser?._id) return;
+        if (!query.trim() || isSubmitting || !currentUser?._id) return;
 
         setIsSubmitting(true);
-        setMessage("");
-        setInputKey((prev) => prev + 1);
+        setQuery("");
         try {
-            const newChatId = await sendMessage(message.trim(), selectedModel, chatId, currentUser._id);
+            const newChatId = await sendMessage(query.trim(), selectedModel, chatId, currentUser._id);
 
             // If we are on the root path (starting a brand-new chat), redirect to the new chat route
             if (!chatId && newChatId) {
@@ -127,21 +81,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
             console.error("Failed to send message:", error);
         } finally {
             setIsSubmitting(false);
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === "Enter") {
-            if (e.shiftKey) {
-                // Shift+Enter: Allow default behavior (new line)
-                return;
-            } else {
-                // Enter: Submit the message
-                e.preventDefault();
-                if (message.trim() && !isSubmitting && !isStreaming) {
-                    void handleSubmit(e as unknown as React.FormEvent);
-                }
-            }
         }
     };
 
@@ -205,61 +144,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
             {/* Input & Suggestions - Fixed at bottom */}
             <div className="bg-background flex-shrink-0">
                 <div className="">
-                    <AIInput onSubmit={handleSubmit}>
-                        <AIInputTextarea
-                            ref={textareaRef}
-                            key={inputKey}
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="What would you like to know?"
-                            disabled={isSubmitting || isStreaming}
-                            minHeight={20}
-                            maxHeight={200}
-                        />
-                        <AIInputToolbar>
-                            <AIInputTools>
-                                <AIInputButton>
-                                    <PlusIcon size={16} />
-                                </AIInputButton>
-                                <AIInputButton>
-                                    <MicIcon size={16} />
-                                </AIInputButton>
-                                <AIInputButton>
-                                    <GlobeIcon size={16} />
-                                    <span>Search</span>
-                                </AIInputButton>
-                                <AIInputModelSelect value={selectedModel} onValueChange={setSelectedModel}>
-                                    <AIInputModelSelectTrigger>
-                                        <AIInputModelSelectValue placeholder="Select a model" />
-                                    </AIInputModelSelectTrigger>
-                                    <AIInputModelSelectContent>
-                                        {Object.entries(modelsByProvider).map(([providerName, modelsInProvider]) => (
-                                            <SelectGroup key={providerName}>
-                                                <SelectLabel>{providerName}</SelectLabel>
-                                                {Object.entries(modelsInProvider).map(([modelId, model]: [string, ModelDefinition]) => {
-                                                    const features: ModelFeatures = model.features ?? {};
-                                                    return (
-                                                        <AIInputModelSelectItem key={modelId} value={modelId}>
-                                                            <div className="flex items-center gap-2">
-                                                                {model.name}
-                                                                {features.imageInput && <ImageIcon size={14} className="text-muted-foreground" />}
-                                                                {features.thinking && <Brain size={14} className="text-muted-foreground" />}
-                                                                {features.free && <Sparkles size={14} className="text-muted-foreground" />}
-                                                            </div>
-                                                        </AIInputModelSelectItem>
-                                                    );
-                                                })}
-                                            </SelectGroup>
-                                        ))}
-                                    </AIInputModelSelectContent>
-                                </AIInputModelSelect>
-                            </AIInputTools>
-                            <AIInputSubmit disabled={!message.trim() || isSubmitting || isStreaming}>
-                                <SendIcon className="h-4 w-4" />
-                            </AIInputSubmit>
-                        </AIInputToolbar>
-                    </AIInput>
+                    <ChatInput chatId={chatId ?? null} disabled={isSubmitting || isStreaming} onSubmit={handleSubmit} />
                 </div>
             </div>
         </div>
