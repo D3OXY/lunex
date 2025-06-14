@@ -1,6 +1,8 @@
 import { entsTableFactory } from "convex-ents";
 import { customCtx, customMutation, customQuery } from "convex-helpers/server/customFunctions";
 import {
+    // eslint-disable-next-line no-restricted-imports
+    action as baseAction,
     internalMutation as baseInternalMutation,
     internalQuery as baseInternalQuery,
     // eslint-disable-next-line no-restricted-imports
@@ -49,3 +51,5 @@ export const internalMutation = customMutation(
         };
     })
 );
+
+export const action = baseAction;

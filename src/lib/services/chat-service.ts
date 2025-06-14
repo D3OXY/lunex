@@ -86,7 +86,6 @@ export function useChatService() {
     const createChat = useMutation(api.chats.createChat);
     const updateMessages = useMutation(api.chats.updateMessages);
     const deleteChat = useMutation(api.chats.deleteChat);
-    const updateChatTitle = useMutation(api.chats.updateChatTitle);
 
     const { setIsStreaming, addMessage: addMessageToStore, updateMessage, addChat: addChatToStore, getCurrentChat } = useChatStore();
 
@@ -95,7 +94,10 @@ export function useChatService() {
 
         // Create new chat if needed
         if (!currentChatId && userId) {
-            currentChatId = await createChat({ title: "New Chat" });
+            currentChatId = await createChat({
+                title: "New Chat",
+                userMessage: content, // Pass user message for background title generation
+            });
 
             if (currentChatId) {
                 const newChat: Chat = {
@@ -187,6 +189,5 @@ export function useChatService() {
         sendMessage,
         createChat,
         deleteChat,
-        updateChatTitle,
     };
 }

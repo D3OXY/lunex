@@ -4,13 +4,23 @@ import { ChatInput } from "@/components/chat/chat-input";
 import { ErrorBoundary } from "@/components/providers/ErrorBoundary";
 import SidebarWrapper from "@/components/sidebar/sidebar-wrapper";
 import { useUser } from "@clerk/nextjs";
-import { Authenticated } from "convex/react";
+import { Authenticated, useQuery } from "convex/react";
 import { PlusCircle, Compass, Code, Book } from "lucide-react";
 import { useChatStore } from "@/lib/stores/chat-store";
+import { useChatService } from "@/lib/services/chat-service";
+import { api } from "../../convex/_generated/api";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Home(): React.JSX.Element {
-    const { setQuery } = useChatStore();
+    const { query, setQuery, selectedModel } = useChatStore();
     const { user } = useUser();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Convex queries and services
+    const currentUser = useQuery(api.user.current, {});
+    const { sendMessage } = useChatService();
+    const navigate = useNavigate();
     return (
         <Authenticated>
             <ErrorBoundary>
@@ -81,9 +91,27 @@ export default function Home(): React.JSX.Element {
                         {/* Welcome message End */}
                         <ChatInput
                             chatId={null}
-                            disabled={false}
-                            onSubmit={() => {
-                                console.info("submit");
+                            disabled={isSubmitting}
+                            onSubmit={async (e: React.FormEvent) => {
+                                e.preventDefault();
+                                if (!query.trim() || isSubmitting || !currentUser?._id) return;
+
+                                setIsSubmitting(true);
+                                setQuery("");
+
+                                try {
+                                    // Create new chat and start streaming - title will be generated in background
+                                    const newChatId = await sendMessage(query.trim(), selectedModel, undefined, currentUser._id);
+
+                                    // Navigate to the new chat
+                                    if (newChatId) {
+                                        void navigate(`/chat/${newChatId}`);
+                                    }
+                                } catch (error) {
+                                    console.error("Failed to create chat:", error);
+                                } finally {
+                                    setIsSubmitting(false);
+                                }
                             }}
                         />
                     </div>
