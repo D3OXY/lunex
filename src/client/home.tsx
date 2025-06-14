@@ -19,7 +19,7 @@ export default function Home(): React.JSX.Element {
 
     // Convex queries and services
     const currentUser = useQuery(api.user.current, {});
-    const { sendMessage } = useChatService();
+    const { sendMessage, createChat } = useChatService();
     const navigate = useNavigate();
     return (
         <Authenticated>
@@ -101,12 +101,10 @@ export default function Home(): React.JSX.Element {
 
                                 try {
                                     // Create new chat and start streaming - title will be generated in background
-                                    const newChatId = await sendMessage(query.trim(), selectedModel, undefined, currentUser._id);
-
-                                    // Navigate to the new chat
-                                    if (newChatId) {
-                                        void navigate(`/chat/${newChatId}`);
-                                    }
+                                    const newChatId = await sendMessage(query.trim(), selectedModel, undefined, currentUser._id, (chatId) => {
+                                        // Navigate immediately when chat is created (before streaming starts)
+                                        void navigate(`/chat/${chatId}`);
+                                    });
                                 } catch (error) {
                                     console.error("Failed to create chat:", error);
                                 } finally {

@@ -89,7 +89,13 @@ export function useChatService() {
 
     const { setIsStreaming, addMessage: addMessageToStore, updateMessage, addChat: addChatToStore, getCurrentChat, setCurrentChatId } = useChatStore();
 
-    const sendMessage = async (content: string, modelId: string, chatId?: Id<"chats">, userId?: Id<"users">): Promise<Id<"chats">> => {
+    const sendMessage = async (
+        content: string,
+        modelId: string,
+        chatId?: Id<"chats">,
+        userId?: Id<"users">,
+        onChatCreated?: (chatId: Id<"chats">) => void
+    ): Promise<Id<"chats">> => {
         let currentChatId = chatId;
 
         // Create new chat if needed
@@ -109,6 +115,9 @@ export function useChatService() {
                 };
                 addChatToStore(newChat);
                 setCurrentChatId(currentChatId); // Set as current chat immediately
+
+                // Call the callback if provided (for immediate navigation)
+                onChatCreated?.(currentChatId);
             }
         }
 
