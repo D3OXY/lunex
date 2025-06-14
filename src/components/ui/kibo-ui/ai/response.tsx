@@ -92,24 +92,42 @@ const components: Options["components"] = {
         </h6>
     ),
     code: ({ node, className, children }) => {
-        // If className contains language-, it's a code block; otherwise it's inline code
-        const hasLanguageClass = typeof className === "string" && className.includes("language-");
+        // Check if it's a fenced code block by looking for "language-" in the className prop
+        const isFencedCodeBlock = typeof className === "string" && className.includes("language-");
 
-        if (!hasLanguageClass) {
+        if (!isFencedCodeBlock) {
+            // Inline code
             return <code className={cn("bg-muted rounded px-1.5 py-0.5 font-mono text-base tracking-wide", className)}>{children}</code>;
         }
 
-        // For code blocks (fenced code), render with full CodeBlock component
-        let language = "javascript";
+        let language = "javascript"; // Default to javascript for safety
 
-        if (typeof node?.properties?.className === "string") {
-            language = node.properties.className.replace("language-", "");
+        // Extract language from the className prop for fenced code blocks
+        if (typeof className === "string") {
+            const languageClass = className.split(" ").find((cls) => cls.startsWith("language-"));
+            if (languageClass) {
+                language = languageClass.replace("language-", "");
+            }
         }
+
+        const languageToFileExtension: Record<string, string> = {
+            javascript: "js",
+            typescript: "ts",
+            python: "py",
+            html: "html",
+            css: "css",
+            json: "json",
+            bash: "sh",
+            nginx: "conf",
+            // Add more as needed
+        };
+
+        const fileExtension = languageToFileExtension[language] ?? language;
 
         const data: CodeBlockProps["data"] = [
             {
                 language,
-                filename: `code.${language === "javascript" ? "js" : language}`,
+                filename: `code.${fileExtension}`,
                 code: children as string,
             },
         ];
