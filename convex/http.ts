@@ -4,9 +4,9 @@ import { httpRouter } from "convex/server";
 const http = httpRouter();
 
 http.route({
-  path: "/clerk-users-webhook",
-  method: "POST",
-  handler: clerkUserWebhookHandler,
+    path: "/clerk-users-webhook",
+    method: "POST",
+    handler: clerkUserWebhookHandler,
 });
 
 export default http;

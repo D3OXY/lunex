@@ -8,14 +8,10 @@ import { env } from "@/env";
 
 export const convex = new ConvexReactClient(env.NEXT_PUBLIC_CONVEX_URL);
 
-export default function ConvexClientProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  return (
-    <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-      {children}
-    </ConvexProviderWithClerk>
-  );
+export default function ConvexClientProvider({ children }: { children: ReactNode }) {
+    return (
+        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+            {children}
+        </ConvexProviderWithClerk>
+    );
 }

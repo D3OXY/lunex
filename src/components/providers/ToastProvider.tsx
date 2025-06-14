@@ -5,15 +5,15 @@ import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 
 export const ToasterProvider = () => {
-  const { theme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+    const { theme } = useTheme();
+    const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
-  if (!mounted) {
-    return null;
-  }
-  return <Toaster theme={theme as "light" | "dark"} closeButton richColors />;
+    if (!mounted) {
+        return null;
+    }
+    return <Toaster theme={theme as "light" | "dark"} closeButton richColors />;
 };
