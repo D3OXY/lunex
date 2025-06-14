@@ -169,7 +169,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                     allMessages.map((msg, index) => (
                                         <AIMessage key={`${index}-${msg.role}`} from={msg.role}>
                                             <AIMessageAvatar
-                                                src={msg.role === "user" ? (clerkUser?.imageUrl ?? "") : "/ai-avatar.png"}
+                                                src={msg.role === "user" ? (clerkUser?.imageUrl ?? "") : "/neo.png"}
                                                 name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "T3"}
                                             />
                                             <AIMessageContent>
