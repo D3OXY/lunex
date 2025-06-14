@@ -101,7 +101,7 @@ export const ChatInput = ({ chatId, disabled, onSubmit }: { chatId: Id<"chats"> 
                                                 <div className="flex items-center gap-2">
                                                     {model.name}
                                                     {features.imageInput && <ImageIcon size={14} className="text-muted-foreground" />}
-                                                    {features.thinking && <Brain size={14} className="text-muted-foreground" />}
+                                                    {features.reasoning && <Brain size={14} className="text-muted-foreground" />}
                                                     {features.free && <Sparkles size={14} className="text-muted-foreground" />}
                                                 </div>
                                             </AIInputModelSelectItem>

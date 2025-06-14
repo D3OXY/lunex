@@ -18,7 +18,7 @@ export const MODELS = {
         provider: "Google",
         features: {
             imageInput: true,
-            thinking: true,
+            reasoning: true,
         },
     },
     "google/gemini-2.5-pro-preview": {
@@ -26,7 +26,7 @@ export const MODELS = {
         provider: "Google",
         features: {
             imageInput: true,
-            thinking: true,
+            reasoning: true,
         },
     },
     "google/gemini-2.5-pro-exp-03-25": {
@@ -34,7 +34,7 @@ export const MODELS = {
         provider: "Google",
         features: {
             imageInput: true,
-            thinking: true,
+            reasoning: true,
             free: true,
         },
     },
@@ -78,14 +78,14 @@ export const MODELS = {
         provider: "DeepSeek",
         features: {
             free: true,
-            thinking: true,
+            reasoning: true,
         },
     },
 } as const;
 
 export type ModelFeatures = {
     imageInput?: boolean;
-    thinking?: boolean;
+    reasoning?: boolean;
     free?: boolean;
 };
 
