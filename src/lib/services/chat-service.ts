@@ -131,7 +131,7 @@ export function useChatService() {
 
             // Create new chat if needed
             if (!currentChatId && userId) {
-                const title = content.length > 50 ? content.substring(0, 50) + "..." : content;
+                const title = "New Chat";
                 currentChatId = await createChat({ title });
 
                 // Optimistically add chat to local store so it appears immediately in sidebar
