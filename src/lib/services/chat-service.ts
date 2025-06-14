@@ -184,23 +184,24 @@ export function useChatService() {
                         (chunk: string) => {
                             fullResponse += chunk;
 
-                            // Throttle updates internally in sendMessage (if onStream consumer implements own buffering)
+                            // Update UI with streaming content
                             const now = Date.now();
                             if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
+                                updateMessage(currentChatId, assistantIndex, fullResponse);
                                 lastUpdate = now;
                             }
-
-                            // Persist partial content
-                            const sanitized: Message[] = baseMessages.map((m) => ({ role: m.role, content: m.content }));
-                            void updateMessages({
-                                chatId: currentChatId,
-                                messages: [...sanitized, { role: "assistant", content: fullResponse }],
-                            });
                         },
                         (response) => {
                             setIsStreaming(false);
-                            // Replace the placeholder's streaming flag by updating its content one final time
+                            // Final UI update
                             updateMessage(currentChatId, assistantIndex, response);
+
+                            // Persist final content to database
+                            const sanitized: Message[] = baseMessages.map((m) => ({ role: m.role, content: m.content }));
+                            void updateMessages({
+                                chatId: currentChatId,
+                                messages: [...sanitized, { role: "assistant", content: response }],
+                            });
                         },
                         (error: string) => {
                             console.error("Stream error:", error);
