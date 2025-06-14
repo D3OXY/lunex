@@ -28,16 +28,8 @@ export const MODELS = {
         provider: "Google",
         features: {
             imageInput: true,
+            coding: true,
             reasoning: true,
-        },
-    },
-    "google/gemini-2.5-pro-exp-03-25": {
-        name: "Gemini 2.5 Pro Exp 03-25",
-        provider: "Google",
-        features: {
-            imageInput: true,
-            reasoning: true,
-            free: true,
         },
     },
     "qwen/qwen2.5-vl-72b-instruct:free": {
@@ -51,6 +43,7 @@ export const MODELS = {
         name: "Qwen 2.5 Coder 32B Instruct",
         provider: "Qwen",
         features: {
+            coding: true,
             free: true,
         },
     },
@@ -58,6 +51,7 @@ export const MODELS = {
         name: "DeepSeek R1 0528 Qwen3 8B",
         provider: "DeepSeek",
         features: {
+            coding: true,
             free: true,
             reasoning: true,
         },
@@ -66,6 +60,7 @@ export const MODELS = {
         name: "DeepSeek R1 0528",
         provider: "DeepSeek",
         features: {
+            coding: true,
             free: true,
             reasoning: true,
         },
@@ -84,11 +79,50 @@ export const MODELS = {
             free: true,
         },
     },
+    "meta-llama/llama-3.3-8b-instruct:free": {
+        name: "Llama 3.3 8B Instruct",
+        provider: "Meta",
+        features: {
+            free: true,
+        },
+    },
+    "mistralai/mistral-small-24b-instruct-2501:free": {
+        name: "Mistral Small 24B Instruct 2501",
+        provider: "Mistral",
+        features: {
+            free: true,
+        },
+    },
+    "anthropic/claude-3-haiku:beta": {
+        name: "Claude 3 Haiku (Self Moderated)",
+        provider: "Anthropic",
+        features: {
+            free: true,
+            selfModerated: true,
+        },
+    },
+    "anthropic/claude-3-haiku": {
+        name: "Claude 3 Haiku",
+        provider: "Anthropic",
+        features: {
+            free: true,
+        },
+    },
+    "openai/gpt-4.1-nano": {
+        name: "GPT-4.1 Nano",
+        provider: "OpenAI",
+        features: {
+            coding: true,
+            free: true,
+        },
+    },
 } as const;
 
 export type ModelFeatures = {
     imageInput?: boolean;
     reasoning?: boolean;
+    selfModerated?: boolean;
+    coding?: boolean;
     free?: boolean;
 };
 

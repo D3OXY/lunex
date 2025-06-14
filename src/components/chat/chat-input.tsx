@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/kibo-ui/ai/input";
 import { SelectGroup, SelectLabel } from "@/components/ui/select";
 import { useChatStore } from "@/lib/stores/chat-store";
-import { Brain, GlobeIcon, ImageIcon, MicIcon, PlusIcon, SendIcon, Sparkles } from "lucide-react";
+import { Brain, CodeIcon, GlobeIcon, ImageIcon, MicIcon, PlusIcon, SendIcon, ShieldCheck, Sparkles } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { getModelsByProvider, type ModelDefinition, type ModelFeatures } from "@/lib/models";
@@ -90,7 +90,7 @@ export const ChatInput = ({ chatId, disabled, onSubmit }: { chatId: Id<"chats"> 
                         <AIInputModelSelectTrigger>
                             <AIInputModelSelectValue placeholder="Select a model" />
                         </AIInputModelSelectTrigger>
-                        <AIInputModelSelectContent>
+                        <AIInputModelSelectContent className="max-h-[500px] overflow-y-auto">
                             {Object.entries(getModelsByProvider()).map(([providerName, modelsInProvider]) => (
                                 <SelectGroup key={providerName}>
                                     <SelectLabel>{providerName}</SelectLabel>
@@ -102,7 +102,9 @@ export const ChatInput = ({ chatId, disabled, onSubmit }: { chatId: Id<"chats"> 
                                                     {model.name}
                                                     {features.imageInput && <ImageIcon size={14} className="text-muted-foreground" />}
                                                     {features.reasoning && <Brain size={14} className="text-muted-foreground" />}
+                                                    {features.selfModerated && <ShieldCheck size={14} className="text-muted-foreground" />}
                                                     {features.free && <Sparkles size={14} className="text-muted-foreground" />}
+                                                    {features.coding && <CodeIcon size={14} className="text-muted-foreground" />}
                                                 </div>
                                             </AIInputModelSelectItem>
                                         );
