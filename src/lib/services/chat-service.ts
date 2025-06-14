@@ -87,7 +87,7 @@ export function useChatService() {
     const updateMessages = useMutation(api.chats.updateMessages);
     const deleteChat = useMutation(api.chats.deleteChat);
 
-    const { setIsStreaming, addMessage: addMessageToStore, updateMessage, addChat: addChatToStore, getCurrentChat } = useChatStore();
+    const { setIsStreaming, addMessage: addMessageToStore, updateMessage, addChat: addChatToStore, getCurrentChat, setCurrentChatId } = useChatStore();
 
     const sendMessage = async (content: string, modelId: string, chatId?: Id<"chats">, userId?: Id<"users">): Promise<Id<"chats">> => {
         let currentChatId = chatId;
@@ -108,6 +108,7 @@ export function useChatService() {
                     _creationTime: Date.now(),
                 };
                 addChatToStore(newChat);
+                setCurrentChatId(currentChatId); // Set as current chat immediately
             }
         }
 
@@ -115,9 +116,15 @@ export function useChatService() {
             throw new Error("Chat ID not available");
         }
 
-        // Add user message and assistant placeholder
+        // Add user message to the chat
         addMessageToStore(currentChatId, { role: "user", content });
-        const baseMessages: Message[] = getCurrentChat()?.messages ?? [{ role: "user", content }];
+
+        // For new chats, we know the messages are just the user message we added
+        // For existing chats, get the current messages
+        const isNewChat = !chatId;
+        const baseMessages: Message[] = isNewChat ? [{ role: "user", content }] : (getCurrentChat()?.messages ?? [{ role: "user", content }]);
+
+        // Add assistant placeholder
         addMessageToStore(currentChatId, { role: "assistant", content: "", isStreaming: true });
 
         const assistantIndex = baseMessages.length;
