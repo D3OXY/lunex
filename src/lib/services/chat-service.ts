@@ -3,228 +3,177 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useChatStore, type Chat } from "../stores/chat-store";
 
-type Role = "user" | "assistant";
-
 interface Message {
-    role: Role;
+    role: "user" | "assistant";
     content: string;
-}
-
-interface Usage {
-    promptTokens?: number;
-    completionTokens?: number;
-    totalTokens?: number;
 }
 
 interface StreamingResponse {
     type: "start" | "delta" | "complete" | "error";
     content?: string;
-    chatId?: string;
-    usage?: Usage;
     error?: string;
 }
 
-export class ChatService {
-    private static instance: ChatService;
+const UPDATE_INTERVAL_MS = 50;
+const MAX_RETRY_ATTEMPTS = 3;
 
-    static getInstance(): ChatService {
-        if (!ChatService.instance) {
-            ChatService.instance = new ChatService();
-        }
-        return ChatService.instance;
+const isStreamingResponse = (value: unknown): value is StreamingResponse => {
+    if (typeof value !== "object" || value === null) return false;
+    const t = (value as StreamingResponse).type;
+    return t === "start" || t === "delta" || t === "complete" || t === "error";
+};
+
+const streamChatResponse = async (
+    messages: Message[],
+    chatId: Id<"chats">,
+    modelId: string,
+    onStream?: (content: string) => void,
+    onComplete?: (fullResponse: string) => void,
+    onError?: (error: string) => void
+): Promise<void> => {
+    const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages, chatId, modelId }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    async sendMessage(
-        messages: Message[],
-        chatId: Id<"chats">,
-        modelId: string,
-        onStream?: (content: string) => void,
-        onComplete?: (fullResponse: string) => void,
-        onError?: (error: string) => void
-    ): Promise<void> {
-        try {
-            const response = await fetch("/api/chat/stream", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ messages, chatId, modelId }),
-            });
+    const reader = response.body?.getReader();
+    if (!reader) {
+        throw new Error("Response body is not readable");
+    }
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+    const decoder = new TextDecoder();
+    let fullResponse = "";
 
-            const reader = response.body?.getReader();
-            if (!reader) {
-                throw new Error("Response body is not readable");
-            }
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-            const decoder = new TextDecoder();
-            let fullResponse = "";
-            let lastUpdate = Date.now();
-            const UPDATE_INTERVAL_MS = 50;
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n").filter((line) => line.trim());
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+        for (const line of lines) {
+            try {
+                const parsed = JSON.parse(line) as unknown;
+                if (!isStreamingResponse(parsed)) continue;
 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split("\n").filter((line) => line.trim());
-
-                for (const line of lines) {
-                    try {
-                        const parsedUnknown = JSON.parse(line) as unknown;
-                        if (!isStreamingResponse(parsedUnknown)) {
-                            continue;
+                switch (parsed.type) {
+                    case "delta":
+                        if (parsed.content) {
+                            fullResponse += parsed.content;
+                            onStream?.(parsed.content);
                         }
-
-                        switch (parsedUnknown.type) {
-                            case "start":
-                                // Initialize streaming
-                                break;
-                            case "delta":
-                                if (parsedUnknown.content) {
-                                    fullResponse += parsedUnknown.content;
-                                    onStream?.(parsedUnknown.content);
-
-                                    // Throttle updates time tracking within internal stream
-                                    const now = Date.now();
-                                    if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
-                                        lastUpdate = now;
-                                    }
-                                }
-                                break;
-                            case "complete":
-                                onComplete?.(fullResponse);
-                                return;
-                            case "error":
-                                onError?.(parsedUnknown.error ?? "Unknown error");
-                                return;
-                        }
-                    } catch {
-                        // Ignore parsing errors for individual chunks
-                    }
+                        break;
+                    case "complete":
+                        onComplete?.(fullResponse);
+                        return;
+                    case "error":
+                        onError?.(parsed.error ?? "Unknown error");
+                        return;
                 }
+            } catch {
+                // Ignore parsing errors for individual chunks
             }
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : "Unknown error";
-            console.error("Custom streaming error:", message);
-            onError?.(message);
         }
     }
-}
+};
 
-// Hook for using chat service with Convex integration
 export function useChatService() {
     const createChat = useMutation(api.chats.createChat);
     const updateMessages = useMutation(api.chats.updateMessages);
     const deleteChat = useMutation(api.chats.deleteChat);
     const updateChatTitle = useMutation(api.chats.updateChatTitle);
 
-    const chatService = ChatService.getInstance();
     const { setIsStreaming, addMessage: addMessageToStore, updateMessage, addChat: addChatToStore, getCurrentChat } = useChatStore();
 
     const sendMessage = async (content: string, modelId: string, chatId?: Id<"chats">, userId?: Id<"users">): Promise<Id<"chats">> => {
-        try {
-            let currentChatId = chatId;
+        let currentChatId = chatId;
 
-            // Create new chat if needed
-            if (!currentChatId && userId) {
-                const title = "New Chat";
-                currentChatId = await createChat({ title });
+        // Create new chat if needed
+        if (!currentChatId && userId) {
+            currentChatId = await createChat({ title: "New Chat" });
 
-                // Optimistically add chat to local store so it appears immediately in sidebar
-                if (currentChatId) {
-                    const newChat: Chat = {
-                        _id: currentChatId,
-                        userId,
-                        title,
-                        messages: [],
-                        _creationTime: Date.now(),
-                    };
-                    addChatToStore(newChat);
-                }
+            if (currentChatId) {
+                const newChat: Chat = {
+                    _id: currentChatId,
+                    userId,
+                    title: "New Chat",
+                    messages: [],
+                    _creationTime: Date.now(),
+                };
+                addChatToStore(newChat);
             }
+        }
 
-            if (!currentChatId) {
-                throw new Error("Chat ID not available");
-            }
+        if (!currentChatId) {
+            throw new Error("Chat ID not available");
+        }
 
-            // Add user message to store (optimistic UI update); will be persisted via updateMessages later
-            addMessageToStore(currentChatId, { role: "user", content });
+        // Add user message and assistant placeholder
+        addMessageToStore(currentChatId, { role: "user", content });
+        const baseMessages: Message[] = getCurrentChat()?.messages ?? [{ role: "user", content }];
+        addMessageToStore(currentChatId, { role: "assistant", content: "", isStreaming: true });
 
-            // Snapshot current messages (includes the user message we just added, but not the upcoming placeholder)
-            const baseMessages: Message[] = getCurrentChat()?.messages ?? [{ role: "user", content }];
+        const assistantIndex = baseMessages.length;
+        const messages: Message[] = [...baseMessages];
 
-            // Add placeholder assistant message that will be updated as stream arrives
-            addMessageToStore(currentChatId, { role: "assistant", content: "", isStreaming: true });
+        setIsStreaming(true);
 
-            // Index of the assistant placeholder message (0-based)
-            const assistantIndex = baseMessages.length;
+        let fullResponse = "";
+        let lastUpdate = Date.now();
+        let attempt = 0;
 
-            // We will stream based on the base messages (without placeholder) for persistence
-            const messages: Message[] = [...baseMessages];
-
-            setIsStreaming(true);
-
-            let fullResponse = "";
-            let lastUpdate = Date.now();
-            const UPDATE_INTERVAL_MS = 50;
-
-            let attempt = 0;
-            const maxAttempts = 3;
-
-            const executeStream = async (): Promise<void> => {
-                try {
-                    await chatService.sendMessage(
-                        messages,
-                        currentChatId,
-                        modelId,
-                        (chunk: string) => {
-                            fullResponse += chunk;
-
-                            // Update UI with streaming content
-                            const now = Date.now();
-                            if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
-                                updateMessage(currentChatId, assistantIndex, fullResponse);
-                                lastUpdate = now;
-                            }
-                        },
-                        (response) => {
-                            setIsStreaming(false);
-                            // Final UI update
-                            updateMessage(currentChatId, assistantIndex, response);
-
-                            // Persist final content to database
-                            const sanitized: Message[] = baseMessages.map((m) => ({ role: m.role, content: m.content }));
-                            void updateMessages({
-                                chatId: currentChatId,
-                                messages: [...sanitized, { role: "assistant", content: response }],
-                            });
-                        },
-                        (error: string) => {
-                            console.error("Stream error:", error);
-                            attempt += 1;
-                            if (attempt < maxAttempts) {
-                                const backoffMs = 1000 * attempt;
-                                console.info(`Retrying stream in ${backoffMs}ms (attempt ${attempt + 1}/${maxAttempts})...`);
-                                setTimeout(() => {
-                                    void executeStream();
-                                }, backoffMs);
-                            } else {
-                                setIsStreaming(false);
-                                updateMessage(currentChatId, assistantIndex, `Error after ${maxAttempts} attempts: ${error}`);
-                            }
+        const executeStream = async (): Promise<void> => {
+            try {
+                await streamChatResponse(
+                    messages,
+                    currentChatId,
+                    modelId,
+                    (chunk: string) => {
+                        fullResponse += chunk;
+                        const now = Date.now();
+                        if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
+                            updateMessage(currentChatId, assistantIndex, fullResponse);
+                            lastUpdate = now;
                         }
-                    );
-                } catch (err: unknown) {
-                    console.error("executeStream error", err instanceof Error ? err.message : err);
-                }
-            };
+                    },
+                    (response) => {
+                        setIsStreaming(false);
+                        updateMessage(currentChatId, assistantIndex, response);
 
+                        // Persist to database
+                        const sanitized: Message[] = baseMessages.map((m) => ({ role: m.role, content: m.content }));
+                        void updateMessages({
+                            chatId: currentChatId,
+                            messages: [...sanitized, { role: "assistant", content: response }],
+                        });
+                    },
+                    (error: string) => {
+                        console.error("Stream error:", error);
+                        attempt += 1;
+                        if (attempt < MAX_RETRY_ATTEMPTS) {
+                            const backoffMs = 1000 * attempt;
+                            console.info(`Retrying stream in ${backoffMs}ms (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS})...`);
+                            setTimeout(() => void executeStream(), backoffMs);
+                        } else {
+                            setIsStreaming(false);
+                            updateMessage(currentChatId, assistantIndex, `Error after ${MAX_RETRY_ATTEMPTS} attempts: ${error}`);
+                        }
+                    }
+                );
+            } catch (err: unknown) {
+                console.error("executeStream error", err instanceof Error ? err.message : err);
+                setIsStreaming(false);
+                updateMessage(currentChatId, assistantIndex, "An error occurred while streaming the response");
+            }
+        };
+
+        try {
             await executeStream();
-
             return currentChatId;
         } catch (error: unknown) {
             setIsStreaming(false);
@@ -239,12 +188,5 @@ export function useChatService() {
         createChat,
         deleteChat,
         updateChatTitle,
-        chatService,
     };
 }
-
-const isStreamingResponse = (value: unknown): value is StreamingResponse => {
-    if (typeof value !== "object" || value === null) return false;
-    const t = (value as StreamingResponse).type;
-    return t === "start" || t === "delta" || t === "complete" || t === "error";
-};
