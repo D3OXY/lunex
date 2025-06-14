@@ -41,7 +41,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
     // Convex queries
     const currentUser = useQuery(api.user.current, {});
-    const userChats = useQuery(api.chats.getUserChats, currentUser && currentUser._id ? { userId: currentUser._id } : "skip");
+    const userChats = useQuery(api.chats.getUserChats);
 
     const navigate = useNavigate();
 

@@ -5,11 +5,12 @@ import { getUserOrThrow } from "./user";
 
 // Get all chats for a user
 export const getUserChats = query({
-    args: { userId: v.id("users") },
-    handler: async (ctx, { userId }) => {
+    args: {},
+    handler: async (ctx) => {
+        const currentUser = await getUserOrThrow(ctx);
         const chats = await ctx
             .table("chats")
-            .filter((q) => q.eq(q.field("userId"), userId))
+            .filter((q) => q.eq(q.field("userId"), currentUser._id))
             .order("desc")
             .take(50); // Limit to 50 most recent chats
 
@@ -21,7 +22,14 @@ export const getUserChats = query({
 export const getChat = query({
     args: { chatId: v.id("chats") },
     handler: async (ctx, { chatId }) => {
+        const currentUser = await getUserOrThrow(ctx);
         const chat = await ctx.table("chats").get(chatId);
+        if (!chat) {
+            throw new ConvexError("Chat not found");
+        }
+        if (chat.userId !== currentUser._id) {
+            throw new ConvexError("Forbidden");
+        }
         return chat;
     },
 });
@@ -29,23 +37,13 @@ export const getChat = query({
 // Create a new chat
 export const createChat = mutation({
     args: {
-        userId: v.id("users"),
         title: v.string(),
     },
-    handler: async (ctx, { userId, title }) => {
-        // Ensure the caller is authenticated and matches the supplied userId
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            throw new ConvexError("Unauthorized");
-        }
-
+    handler: async (ctx, { title }) => {
         const currentUser = await getUserOrThrow(ctx);
-        if (!currentUser || currentUser._id !== userId) {
-            throw new ConvexError("Forbidden");
-        }
 
         const chatId = await ctx.table("chats").insert({
-            userId,
+            userId: currentUser._id,
             title,
             messages: [],
         });
@@ -62,19 +60,16 @@ export const addMessage = mutation({
         content: v.string(),
     },
     handler: async (ctx, { chatId, role, content }) => {
+        const currentUser = await getUserOrThrow(ctx);
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
             throw new ConvexError("Chat not found");
         }
-
-        // Authorization: allow assistant role or owner user only
-        const identity = await ctx.auth.getUserIdentity();
-        if (role === "user") {
-            if (!identity) throw new ConvexError("Unauthorized");
-            const currentUser = await getUserOrThrow(ctx);
-            if (!currentUser || currentUser._id !== chat.userId) {
-                throw new ConvexError("Forbidden");
-            }
+        if (chat.userId !== currentUser._id) {
+            throw new ConvexError("Forbidden");
+        }
+        if (!chat) {
+            throw new ConvexError("Chat not found");
         }
 
         const newMessage = { role, content };
@@ -95,14 +90,12 @@ export const updateChatTitle = mutation({
         title: v.string(),
     },
     handler: async (ctx, { chatId, title }) => {
+        const currentUser = await getUserOrThrow(ctx);
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
             throw new ConvexError("Chat not found");
         }
-
-        // Authorization: only owner can rename
-        const currentUser = await getUserOrThrow(ctx);
-        if (!currentUser || currentUser._id !== chat.userId) {
+        if (chat.userId !== currentUser._id) {
             throw new ConvexError("Forbidden");
         }
 
@@ -118,14 +111,13 @@ export const updateChatTitle = mutation({
 export const deleteChat = mutation({
     args: { chatId: v.id("chats") },
     handler: async (ctx, { chatId }) => {
+        const currentUser = await getUserOrThrow(ctx);
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
             throw new ConvexError("Chat not found");
         }
 
-        // Authorization: only owner can delete
-        const currentUser = await getUserOrThrow(ctx);
-        if (!currentUser || currentUser._id !== chat.userId) {
+        if (chat.userId !== currentUser._id) {
             throw new ConvexError("Forbidden");
         }
 
@@ -146,13 +138,12 @@ export const updateMessages = mutation({
         ),
     },
     handler: async (ctx, { chatId, messages }) => {
+        const currentUser = await getUserOrThrow(ctx);
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
             throw new ConvexError("Chat not found");
         }
-
-        const currentUser = await getUserOrThrow(ctx);
-        if (!currentUser || currentUser._id !== chat.userId) {
+        if (chat.userId !== currentUser._id) {
             throw new ConvexError("Forbidden");
         }
 

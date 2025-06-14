@@ -24,11 +24,6 @@ interface StreamingResponse {
     error?: string;
 }
 
-interface CompletionResponse {
-    message: string;
-    usage?: Usage;
-}
-
 export class ChatService {
     private static instance: ChatService;
 
@@ -118,32 +113,6 @@ export class ChatService {
             onError?.(message);
         }
     }
-
-    async sendMessageNonStreaming(messages: Message[], chatId: Id<"chats">, modelId: string): Promise<string> {
-        try {
-            const response = await fetch("/api/chat/completion", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ messages, chatId, modelId }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const raw = (await response.json()) as unknown;
-            if (typeof raw === "object" && raw !== null && "message" in raw && typeof (raw as CompletionResponse).message === "string") {
-                return (raw as CompletionResponse).message;
-            }
-            throw new Error("Invalid completion response");
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : new Error("Unknown error");
-            console.error("Non-streaming error:", err.message);
-            throw err;
-        }
-    }
 }
 
 // Hook for using chat service with Convex integration
@@ -163,7 +132,7 @@ export function useChatService() {
             // Create new chat if needed
             if (!currentChatId && userId) {
                 const title = content.length > 50 ? content.substring(0, 50) + "..." : content;
-                currentChatId = await createChat({ userId, title });
+                currentChatId = await createChat({ title });
 
                 // Optimistically add chat to local store so it appears immediately in sidebar
                 if (currentChatId) {

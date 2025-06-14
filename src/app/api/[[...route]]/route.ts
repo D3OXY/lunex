@@ -1,31 +1,18 @@
 /* eslint-disable @typescript-eslint/await-thenable */
+import { env } from "@/env";
 import { MODELS } from "@/lib/models";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { streamText, type CoreMessage } from "ai";
-import { ConvexHttpClient } from "convex/browser";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { stream } from "hono/streaming";
 import { handle } from "hono/vercel";
-import { api as convexApi } from "../../../../convex/_generated/api";
-import type { Id } from "../../../../convex/_generated/dataModel";
-import { env } from "@/env";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
 const openrouter = createOpenRouter({
     apiKey: env.OPENROUTER_API_KEY,
 });
 
 const app = new Hono().basePath("/api");
-
-// Initialize Convex HTTP client for server-side use
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL ?? "");
-
-// Helper to ensure Convex URL is configured
-const requireConvex = () => {
-    if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
-        throw new Error("NEXT_PUBLIC_CONVEX_URL environment variable is not set");
-    }
-};
 
 // Enable CORS for all routes
 app.use(
@@ -36,33 +23,6 @@ app.use(
         allowHeaders: ["Content-Type", "Authorization"],
     })
 );
-
-// Health check endpoint
-app.get("/health", (c) => {
-    return c.json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-// Simple chat endpoint for testing
-app.post("/chat/test", async (c) => {
-    try {
-        const body: { message?: string } = await c.req.json();
-
-        if (!body || typeof body !== "object" || !("message" in body) || typeof body.message !== "string") {
-            return c.json({ error: "Message is required" }, 400);
-        }
-
-        const message = body.message;
-
-        // Mock response for now
-        return c.json({
-            response: `You said: ${message}. This is a test response.`,
-            timestamp: new Date().toISOString(),
-        });
-    } catch (error) {
-        console.error("Chat test error:", error);
-        return c.json({ error: "Internal server error" }, 500);
-    }
-});
 
 // System prompt to ensure responses include properly fenced code blocks with language identifiers.
 const SYSTEM_PROMPT =
@@ -133,104 +93,6 @@ app.post("/chat/stream", async (c) => {
             );
         }
     });
-});
-
-// Chat completion endpoint (non-streaming)
-app.post("/chat/completion", async (c) => {
-    try {
-        const body: { messages?: Array<{ role: string; content: string }>; chatId?: string; modelId?: string } = await c.req.json();
-        const { messages, modelId } = body;
-
-        if (!messages || !Array.isArray(messages)) {
-            return c.json({ error: "Messages array is required" }, 400);
-        }
-
-        // Prepend system prompt
-        const coreMessages: CoreMessage[] = [
-            { role: "system", content: SYSTEM_PROMPT },
-            ...messages.map((msg) => ({
-                role: msg.role as "user" | "assistant" | "system",
-                content: msg.content,
-            })),
-        ];
-
-        if (!modelId || !Object.keys(MODELS).includes(modelId)) {
-            throw new Error("Invalid model id");
-        }
-
-        const result = await streamText({
-            model: openrouter(modelId ?? "google/gemini-2.0-flash-001"),
-            messages: coreMessages,
-        });
-
-        const completion = await result.text;
-
-        return c.json({
-            message: completion,
-            usage: result.usage,
-        });
-    } catch (error) {
-        console.error("Chat completion error:", error);
-        return c.json({ error: "Internal server error" }, 500);
-    }
-});
-
-// Create chat
-app.post("/chat", async (c) => {
-    try {
-        requireConvex();
-        const body: { userId?: string; title?: string } = await c.req.json();
-        if (!body.userId || !body.title) {
-            return c.json({ error: "userId and title required" }, 400);
-        }
-
-        const chatId = await (convex.mutation(convexApi.chats.createChat, {
-            userId: body.userId as Id<"users">,
-            title: body.title,
-        }) as Promise<Id<"chats">>);
-
-        return c.json({ chatId });
-    } catch (error) {
-        console.error("Create chat error", error);
-        return c.json({ error: (error as Error).message ?? "Internal error" }, 500);
-    }
-});
-
-// Get chat by id
-app.get("/chat/:id", async (c) => {
-    try {
-        requireConvex();
-        const id = c.req.param("id");
-        const chat = await (convex.query(convexApi.chats.getChat, { chatId: id as Id<"chats"> }) as Promise<Record<string, unknown> | null>);
-        if (!chat) return c.json({ error: "Chat not found" }, 404);
-        return c.json(chat);
-    } catch (error) {
-        console.error("Get chat error", error);
-        return c.json({ error: (error as Error).message ?? "Internal error" }, 500);
-    }
-});
-
-// Add message to chat
-app.post("/chat/:id/message", async (c) => {
-    try {
-        requireConvex();
-        const id = c.req.param("id");
-        const body: { role?: "user" | "assistant"; content?: string } = await c.req.json();
-        if (!body.role || !body.content) {
-            return c.json({ error: "role and content required" }, 400);
-        }
-
-        await (convex.mutation(convexApi.chats.addMessage, {
-            chatId: id as Id<"chats">,
-            role: body.role,
-            content: body.content,
-        }) as Promise<unknown>);
-
-        return c.json({ success: true });
-    } catch (error) {
-        console.error("Add message error", error);
-        return c.json({ error: (error as Error).message ?? "Internal error" }, 500);
-    }
 });
 
 export const GET = handle(app);
