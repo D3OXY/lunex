@@ -7,7 +7,7 @@ import { api } from "../../../convex/_generated/api";
 import { useChatStore, useCurrentChat, useIsStreaming } from "@/lib/stores/chat-store";
 import { useChatService } from "@/lib/services/chat-service";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 
 // AI Components
 import { AIInput, AIInputTextarea, AIInputToolbar, AIInputSubmit } from "@/components/ui/kibo-ui/ai/input";
@@ -45,7 +45,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const currentUser = useQuery(api.user.current, {});
     const userChats = useQuery(api.chats.getUserChats, currentUser && currentUser._id ? { userId: currentUser._id } : "skip");
 
-    const router = useRouter();
+    const navigate = useNavigate();
 
     // Set current chat when chatId changes
     useEffect(() => {
@@ -79,7 +79,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
             // If we are on the root path (starting a brand-new chat), redirect to the new chat route
             if (!chatId && newChatId) {
-                router.push(`/chat/${newChatId}`);
+                await navigate(`/chat/${newChatId}`);
             }
         } catch (error) {
             console.error("Failed to send message:", error);
