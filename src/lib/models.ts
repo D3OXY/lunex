@@ -73,6 +73,14 @@ export const MODELS = {
             free: true,
         },
     },
+    "deepseek/deepseek-chat-v3-0324:free": {
+        name: "DeepSeek V3 0324",
+        provider: "DeepSeek",
+        features: {
+            free: true,
+            thinking: true,
+        },
+    },
 } as const;
 
 export type ModelFeatures = {
