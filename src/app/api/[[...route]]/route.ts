@@ -24,9 +24,10 @@ app.use(
     })
 );
 
-// System prompt to ensure responses include properly fenced code blocks with language identifiers.
+// const SYSTEM_PROMPT =
+//     "You are Lunex AI. When providing code, always wrap it in fenced markdown blocks with the appropriate language tag (e.g., ```tsx). Do not include extra commentary inside the fences." as const;
 const SYSTEM_PROMPT =
-    "You are Lunex AI. When providing code, always wrap it in fenced markdown blocks with the appropriate language tag (e.g., ```tsx). Do not include extra commentary inside the fences." as const;
+    "You are Lunex AI. When providing code, always wrap it in fenced markdown blocks with the appropriate language tag (e.g., ```tsx). Do not include extra commentary inside the fences. Do not put markdown inside the fences, its rendering is already handled by the markdown renderer." as const;
 
 // Chat streaming endpoint with OpenRouter
 app.post("/chat/stream", async (c) => {

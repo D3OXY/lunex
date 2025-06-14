@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { DEFAULT_MODEL } from "@/lib/models";
 
 interface Message {
     role: "user" | "assistant";
@@ -55,7 +56,7 @@ export const useChatStore = create<ChatState>()(
     subscribeWithSelector((set, get) => ({
         // Initial state
         query: "",
-        selectedModel: "google/gemini-2.5-pro-exp-03-25",
+        selectedModel: DEFAULT_MODEL,
         chats: [],
         currentChatId: null,
         isLoading: false,

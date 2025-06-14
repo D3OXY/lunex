@@ -133,7 +133,7 @@ const components: Options["components"] = {
         ];
 
         return (
-            <CodeBlock className={cn("my-4", className)} data={data} defaultValue={data[0]?.language}>
+            <CodeBlock className={cn("my-4 max-w-full overflow-hidden", className)} data={data} defaultValue={data[0]?.language}>
                 <CodeBlockHeader>
                     <CodeBlockFiles>
                         {(item) => (
@@ -156,10 +156,16 @@ const components: Options["components"] = {
                     </CodeBlockSelect>
                     <CodeBlockCopyButton onCopy={() => console.info("Copied code to clipboard")} onError={() => console.error("Failed to copy code to clipboard")} />
                 </CodeBlockHeader>
-                <CodeBlockBody>
+                <CodeBlockBody className="max-w-full overflow-x-auto">
                     {(item) => (
-                        <CodeBlockItem key={item.language} value={item.language}>
-                            <CodeBlockContent language={item.language as BundledLanguage}>{item.code}</CodeBlockContent>
+                        <CodeBlockItem
+                            key={item.language}
+                            value={item.language}
+                            className="[&_.line]:max-w-full [&_.line]:break-all [&_.line]:whitespace-pre-wrap [&_code]:max-w-full [&_code]:overflow-x-auto"
+                        >
+                            <CodeBlockContent language={item.language as BundledLanguage} className="max-w-full">
+                                {item.code}
+                            </CodeBlockContent>
                         </CodeBlockItem>
                     )}
                 </CodeBlockBody>

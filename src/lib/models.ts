@@ -1,3 +1,5 @@
+export const DEFAULT_MODEL = "google/gemini-2.0-flash-001";
+
 export const MODELS = {
     "google/gemini-2.0-flash-001": {
         name: "Gemini 2.0 Flash",
