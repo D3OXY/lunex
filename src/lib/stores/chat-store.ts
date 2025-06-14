@@ -31,6 +31,7 @@ interface ChatState {
     setQuery: (query: string) => void;
     setSelectedModel: (model: string) => void;
     setChats: (chats: Chat[]) => void;
+    mergeChatsFromServer: (serverChats: Chat[]) => void;
     setCurrentChatId: (chatId: Id<"chats"> | null) => void;
     addChat: (chat: Chat) => void;
     updateChat: (chatId: Id<"chats">, updates: Partial<Chat>) => void;
@@ -65,6 +66,34 @@ export const useChatStore = create<ChatState>()(
         setSelectedModel: (model) => set({ selectedModel: model }),
 
         setChats: (chats) => set({ chats }),
+
+        mergeChatsFromServer: (serverChats) =>
+            set((state) => {
+                // Create a map of current local chats for quick lookup
+                const localChatsMap = new Map(state.chats.map((chat) => [chat._id, chat]));
+
+                // Merge server chats with local state, preserving local optimistic updates
+                const mergedChats = serverChats.map((serverChat) => {
+                    const localChat = localChatsMap.get(serverChat._id);
+                    if (localChat) {
+                        // If we have local changes (like streaming messages), preserve them
+                        // but update server-side properties like title
+                        return {
+                            ...serverChat,
+                            messages: localChat.messages.length > serverChat.messages.length ? localChat.messages : serverChat.messages,
+                        };
+                    }
+                    return serverChat;
+                });
+
+                // Add any local-only chats that aren't on the server yet
+                const serverChatIds = new Set(serverChats.map((chat) => chat._id));
+                const localOnlyChats = state.chats.filter((chat) => !serverChatIds.has(chat._id));
+
+                return {
+                    chats: [...localOnlyChats, ...mergedChats],
+                };
+            }),
 
         setCurrentChatId: (chatId) => set({ currentChatId: chatId }),
 

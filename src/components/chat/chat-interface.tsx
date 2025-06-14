@@ -29,7 +29,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Store hooks
-    const { setCurrentChatId, setChats } = useChatStore();
+    const { setCurrentChatId, mergeChatsFromServer } = useChatStore();
     const currentChat = useCurrentChat();
     const isStreaming = useIsStreaming();
 
@@ -55,9 +55,9 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     // Update chats in store when userChats changes
     useEffect(() => {
         if (userChats && Array.isArray(userChats)) {
-            setChats(userChats);
+            mergeChatsFromServer(userChats);
         }
-    }, [userChats, setChats]);
+    }, [userChats, mergeChatsFromServer]);
 
     // Auto-scroll to bottom
     useEffect(() => {
