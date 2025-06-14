@@ -6,7 +6,7 @@ import { useChatService } from "@/lib/services/chat-service";
 import type { Chat } from "@/lib/stores/chat-store";
 import { useChats } from "@/lib/stores/chat-store";
 import { cn } from "@/lib/utils";
-import { MessageSquareIcon, PencilIcon, PlusIcon, SearchIcon, X, XIcon } from "lucide-react";
+import { MessageSquareIcon, PenLine, PlusIcon, SearchIcon, X, XIcon } from "lucide-react";
 import type { HTMLAttributes, ReactElement } from "react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -184,20 +184,17 @@ export const NavChats = ({ className, onNewChat, ...props }: NavChatsProps): Rea
                                         {/* Hover Overlay Actions */}
                                         {isHovered && (
                                             <div className="from-background via-background/90 animate-in slide-in-from-right-2 fade-in-0 absolute top-0 right-0 bottom-0 z-10 flex items-center justify-end gap-1 bg-gradient-to-l to-transparent pr-2 pl-8 duration-200">
-                                                <button
-                                                    className="h-6 w-6 cursor-pointer p-0 text-white transition-all duration-200 ease-in-out hover:scale-[1.1]"
+                                                <Button
+                                                    variant="ghost"
+                                                    className="h-6 w-6 p-0 text-white"
                                                     onClick={(e) => handleEditClick(e, chat._id, chat.title)}
                                                     title="Rename chat"
                                                 >
-                                                    <PencilIcon className="size-5" />
-                                                </button>
-                                                <button
-                                                    className="h-6 w-6 cursor-pointer p-0 text-white transition-all duration-200 ease-in-out hover:scale-[1.1] hover:text-red-500"
-                                                    onClick={(e) => handleDeleteClick(e, chat._id)}
-                                                    title="Delete chat"
-                                                >
-                                                    <X className="size-5" />
-                                                </button>
+                                                    <PenLine className="size-4" />
+                                                </Button>
+                                                <Button variant="ghost" className="h-6 w-6 p-0 text-white" onClick={(e) => handleDeleteClick(e, chat._id)} title="Delete chat">
+                                                    <X className="size-4" />
+                                                </Button>
                                             </div>
                                         )}
                                     </>

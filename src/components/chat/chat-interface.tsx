@@ -26,7 +26,9 @@ interface ChatInterfaceProps {
 export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element {
     const [message, setMessage] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [inputKey, setInputKey] = useState(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Store hooks
     const { setCurrentChatId, setChats } = useChatStore();
@@ -64,12 +66,36 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [currentChat?.messages, isStreaming]);
 
+    // Auto-focus input when user starts typing
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't interfere if user is already typing in an input/textarea or if modifiers are pressed
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.ctrlKey || e.metaKey || e.altKey || isSubmitting || isStreaming) {
+                return;
+            }
+
+            // Only handle printable characters (letters, numbers, symbols, space)
+            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                e.preventDefault();
+                setMessage((prev) => prev + e.key);
+                // Focus the textarea after state update
+                setTimeout(() => {
+                    textareaRef.current?.focus();
+                }, 0);
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [isSubmitting, isStreaming]);
+
     const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         if (!message.trim() || isSubmitting || !currentUser?._id) return;
 
         setIsSubmitting(true);
         setMessage("");
+        setInputKey((prev) => prev + 1);
         try {
             const newChatId = await sendMessage(message.trim(), chatId, currentUser._id);
 
@@ -81,6 +107,21 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
             console.error("Failed to send message:", error);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === "Enter") {
+            if (e.shiftKey) {
+                // Shift+Enter: Allow default behavior (new line)
+                return;
+            } else {
+                // Enter: Submit the message
+                e.preventDefault();
+                if (message.trim() && !isSubmitting && !isStreaming) {
+                    void handleSubmit(e as unknown as React.FormEvent);
+                }
+            }
         }
     };
 
@@ -142,8 +183,11 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                 <div className="">
                     <AIInput onSubmit={handleSubmit}>
                         <AIInputTextarea
+                            ref={textareaRef}
+                            key={inputKey}
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
+                            onKeyDown={handleKeyDown}
                             placeholder="Type your message here..."
                             disabled={isSubmitting || isStreaming}
                             minHeight={20}
