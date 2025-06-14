@@ -1,10 +1,11 @@
+import AuthWrapper from "@/app/auth-wrapper";
+import { Providers } from "@/app/providers";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import "@/styles/globals.css";
 
 import { type Metadata } from "next";
 import { Inter } from "next/font/google";
-import { Providers } from "./providers";
 
 export const metadata: Metadata = {
     title: APP_NAME,
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     return (
         <html lang="en" suppressHydrationWarning>
             <body className={cn(inter.variable, "dark bg-background font-inter min-h-screen antialiased")}>
-                <Providers>{children}</Providers>
+                <Providers>
+                    <AuthWrapper>{children}</AuthWrapper>
+                </Providers>
             </body>
         </html>
     );
