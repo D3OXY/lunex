@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/kibo-ui/ai/input";
 import { SelectGroup, SelectLabel } from "@/components/ui/select";
 import { useChatStore } from "@/lib/stores/chat-store";
-import { Brain, CodeIcon, GlobeIcon, ImageIcon, MicIcon, SendIcon, ShieldCheck, Sparkles } from "lucide-react";
+import { Brain, CodeIcon, GlobeIcon, ImageIcon, MicIcon, SendIcon, ShieldCheck, Sparkles, UserIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { getModelsByProvider, type ModelDefinition, type ModelFeatures } from "@/lib/models";
@@ -141,6 +141,7 @@ export const ChatInput = ({ chatId, disabled, onSubmit }: { chatId: Id<"chats"> 
                                                         {features.selfModerated && <ShieldCheck size={14} className="text-muted-foreground" />}
                                                         {features.free && <Sparkles size={14} className="text-muted-foreground" />}
                                                         {features.coding && <CodeIcon size={14} className="text-muted-foreground" />}
+                                                        {features.userModel && <UserIcon size={14} className="text-muted-foreground" />}
                                                     </div>
                                                 </AIInputModelSelectItem>
                                             );
