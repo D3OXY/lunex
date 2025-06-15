@@ -146,3 +146,57 @@ export const getModelsByProvider = () => {
     }
     return modelsByProvider;
 };
+
+// Helper function to create user model definition from model ID
+export const createUserModelDefinition = (modelId: string): ModelDefinition => {
+    // Split the model ID and create a readable name
+    const parts = modelId.split("/");
+    const lastPart = parts[parts.length - 1] ?? modelId;
+
+    // Convert to readable name: "claude-3.5-sonnet" -> "Claude 3.5 Sonnet"
+    const name = lastPart
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+
+    return {
+        name,
+        provider: "User",
+        features: {
+            userModel: true,
+        },
+    };
+};
+
+// Get all models including user models
+export const getAllModels = (userModels: string[] = []): Record<string, ModelDefinition> => {
+    const allModels: Record<string, ModelDefinition> = {};
+
+    // Add built-in models
+    for (const modelId in MODELS) {
+        allModels[modelId] = MODELS[modelId as keyof typeof MODELS];
+    }
+
+    // Add user models
+    userModels.forEach((modelId) => {
+        allModels[modelId] ??= createUserModelDefinition(modelId);
+    });
+
+    return allModels;
+};
+
+// Get models by provider including user models
+export const getAllModelsByProvider = (userModels: string[] = []) => {
+    const allModels = getAllModels(userModels);
+    const modelsByProvider: Record<string, Record<string, ModelDefinition>> = {};
+
+    for (const modelId in allModels) {
+        const model = allModels[modelId];
+        if (model) {
+            modelsByProvider[model.provider] ??= {};
+            modelsByProvider[model.provider]![modelId] = model;
+        }
+    }
+
+    return modelsByProvider;
+};

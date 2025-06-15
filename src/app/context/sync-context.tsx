@@ -1,6 +1,7 @@
 "use client";
 
 import { useChatStore } from "@/lib/stores/chat-store";
+import { usePreferencesStore } from "@/lib/stores/preferences-store";
 import { useQuery } from "convex/react";
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
@@ -29,9 +30,11 @@ export function SyncProvider({ children }: SyncProviderProps): React.JSX.Element
     // Convex queries
     const currentUser = useQuery(api.user.current, {});
     const userChats = useQuery(api.chats.getUserChats);
+    const userPreferences = useQuery(api.user_preferences.getUserPreferences);
 
     // Store hooks
-    const { mergeChatsFromServer } = useChatStore();
+    const { mergeChatsFromServer, setSelectedModel } = useChatStore();
+    const { setPreferences, setIsLoading } = usePreferencesStore();
 
     // Sync chats with server when userChats changes
     // The mergeChatsFromServer function already handles stream priority
@@ -41,6 +44,23 @@ export function SyncProvider({ children }: SyncProviderProps): React.JSX.Element
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userChats]);
+
+    // Sync user preferences with server
+    useEffect(() => {
+        if (userPreferences !== undefined) {
+            setPreferences(userPreferences);
+            setIsLoading(false);
+        } else {
+            setIsLoading(true);
+        }
+    }, [userPreferences, setPreferences, setIsLoading]);
+
+    // Sync selected model with default model from preferences (separate effect to avoid loops)
+    useEffect(() => {
+        if (userPreferences?.defaultModel) {
+            setSelectedModel(userPreferences.defaultModel);
+        }
+    }, [userPreferences?.defaultModel, setSelectedModel]);
 
     const contextValue: SyncContextValue = {
         currentUser,
