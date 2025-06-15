@@ -2,12 +2,10 @@
 
 import { useChatService } from "@/lib/services/chat-service";
 import { useChatStore, useCurrentChat, useIsStreaming } from "@/lib/stores/chat-store";
-import { useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { useSyncContext } from "@/app/context/sync-context";
 
 // AI Components
 import { AIBranch, AIBranchMessages, AIBranchNext, AIBranchPage, AIBranchPrevious, AIBranchSelector } from "@/components/ui/kibo-ui/ai/branch";
@@ -18,6 +16,7 @@ import { ReasoningDisplay } from "@/components/reasoning-display";
 // UI Components
 import { ChatInput } from "@/components/chat/chat-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useUser } from "@clerk/nextjs";
 
 interface ChatInterfaceProps {
     chatId?: Id<"chats">;
@@ -30,19 +29,18 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Store hooks
-    const { setCurrentChatId, mergeChatsFromServer } = useChatStore();
+    const { setCurrentChatId } = useChatStore();
     const currentChat = useCurrentChat();
     const isStreaming = useIsStreaming();
 
     // Service hooks
     const { sendMessage } = useChatService();
 
-    // Clerk user hook
-    const { user: clerkUser } = useUser();
+    // Sync context
+    const { currentUser, isLoading } = useSyncContext();
 
-    // Convex queries
-    const currentUser = useQuery(api.user.current, {});
-    const userChats = useQuery(api.chats.getUserChats);
+    // Clerk user hook (for avatar and display name)
+    const { user: clerkUser } = useUser();
 
     const navigate = useNavigate();
 
@@ -52,13 +50,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
             setCurrentChatId(chatId);
         }
     }, [chatId, setCurrentChatId]);
-
-    // Update chats in store when userChats changes
-    useEffect(() => {
-        if (userChats && Array.isArray(userChats)) {
-            mergeChatsFromServer(userChats);
-        }
-    }, [userChats, mergeChatsFromServer]);
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -93,7 +84,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
     const allMessages = currentChat?.messages ?? [];
 
-    if (!currentUser) {
+    if (isLoading || !currentUser) {
         return (
             <div className="flex h-full items-center justify-center">
                 <div className="text-muted-foreground">Loading...</div>

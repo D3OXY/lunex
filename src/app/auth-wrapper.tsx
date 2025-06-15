@@ -3,14 +3,13 @@ import { Button } from "@/components/ui/button";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { Authenticated, Unauthenticated } from "convex/react";
 import { MessageSquareIcon } from "lucide-react";
+import { SyncProvider } from "./context/sync-context";
 
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
     return (
         <div className="flex min-h-screen flex-col">
             <Authenticated>
-                {/* Sync Context */}
-                {children}
-                {/* End Sync Context */}
+                <SyncProvider>{children}</SyncProvider>
             </Authenticated>
             <Unauthenticated>
                 <div className="from-background to-muted flex min-h-screen items-center justify-center bg-gradient-to-br">

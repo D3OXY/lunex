@@ -96,6 +96,7 @@ const streamChatResponse = async (
 export function useChatService() {
     const createChat = useMutation(api.chats.createChat);
     const updateMessages = useMutation(api.chats.updateMessages);
+    const updateChatTitle = useMutation(api.chats.updateChatTitle);
     const deleteChat = useMutation(api.chats.deleteChat);
 
     const { setIsStreaming, addMessage: addMessageToStore, updateMessage, updateMessageReasoning, addChat: addChatToStore, getCurrentChat, setCurrentChatId } = useChatStore();
@@ -218,6 +219,7 @@ export function useChatService() {
     return {
         sendMessage,
         createChat,
+        updateChatTitle,
         deleteChat,
     };
 }
