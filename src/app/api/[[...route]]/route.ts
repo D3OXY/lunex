@@ -14,6 +14,10 @@ const openrouter = createOpenRouter({
 
 const app = new Hono().basePath("/api");
 
+// Configuration for incremental updates
+const CHUNK_UPDATE_THRESHOLD = 50; // Update backend every 50 characters
+const UPDATE_INTERVAL_MS = 1000; // Or every 1 second, whichever comes first
+
 // Enable CORS for all routes
 app.use(
     "*",
@@ -28,6 +32,35 @@ app.use(
 //     "You are Lunex Chat. When providing code, always wrap it in fenced markdown blocks with the appropriate language tag (e.g., ```tsx). Do not include extra commentary inside the fences." as const;
 const SYSTEM_PROMPT =
     "You are Lunex Chat. When providing code, always wrap it in fenced markdown blocks with the appropriate language tag (e.g., ```tsx). Do not include extra commentary inside the fences. Do not put markdown inside the fences, its rendering is already handled by the markdown renderer." as const;
+
+// Helper function to update chat messages in backend
+const updateChatInBackend = async (chatId: string, messages: Array<{ role: "user" | "assistant"; content: string }>, authToken: string): Promise<boolean> => {
+    try {
+        const convexSiteUrl = env.NEXT_PUBLIC_CONVEX_URL.replace(".convex.cloud", ".convex.site");
+
+        const updateResponse = await fetch(`${convexSiteUrl}/update-chat-messages`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({
+                chatId,
+                messages,
+            }),
+        });
+
+        if (!updateResponse.ok) {
+            const errorData = (await updateResponse.json()) as { error?: string };
+            console.error("Failed to update chat in database:", errorData);
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.error("Error updating chat in backend:", error);
+        return false;
+    }
+};
 
 // Chat streaming endpoint with OpenRouter
 app.post("/chat/stream", async (c) => {
@@ -93,6 +126,12 @@ app.post("/chat/stream", async (c) => {
             await stream.write(JSON.stringify({ type: "start", chatId, supportsReasoning }) + "\n");
 
             let fullResponse = "";
+            let lastUpdateLength = 0;
+            let lastUpdateTime = Date.now();
+            let isUpdating = false;
+
+            // Prepare base messages for incremental updates
+            const baseMessages = messages.map((msg) => ({ role: msg.role as "user" | "assistant", content: msg.content }));
 
             // Stream the response using AI SDK's built-in reasoning support
             for await (const part of result.fullStream) {
@@ -105,6 +144,25 @@ app.post("/chat/stream", async (c) => {
                                 content: part.textDelta,
                             }) + "\n"
                         );
+
+                        // Check if we should update the backend incrementally
+                        const now = Date.now();
+                        const shouldUpdateByLength = fullResponse.length - lastUpdateLength >= CHUNK_UPDATE_THRESHOLD;
+                        const shouldUpdateByTime = now - lastUpdateTime >= UPDATE_INTERVAL_MS;
+
+                        if ((shouldUpdateByLength || shouldUpdateByTime) && !isUpdating && fullResponse.trim()) {
+                            isUpdating = true;
+                            lastUpdateLength = fullResponse.length;
+                            lastUpdateTime = now;
+
+                            // Update backend asynchronously without blocking the stream
+                            const updatedMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
+
+                            // Fire and forget - don't await to avoid blocking the stream
+                            void updateChatInBackend(chatId, updatedMessages, authToken).finally(() => {
+                                isUpdating = false;
+                            });
+                        }
                         break;
                     case "reasoning":
                         if (supportsReasoning) {
@@ -117,37 +175,12 @@ app.post("/chat/stream", async (c) => {
                         }
                         break;
                     case "finish":
-                        // Stream is complete - now update the database via HTTP action
-                        try {
-                            // Prepare the complete conversation including the new assistant response
-                            const updatedMessages = [
-                                ...messages.map((msg) => ({ role: msg.role as "user" | "assistant", content: msg.content })),
-                                { role: "assistant" as const, content: fullResponse },
-                            ];
+                        // Final update to ensure we have the complete response
+                        if (fullResponse.trim()) {
+                            const finalMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
 
-                            // Get the Convex deployment URL
-                            const convexSiteUrl = env.NEXT_PUBLIC_CONVEX_URL.replace(".convex.cloud", ".convex.site");
-
-                            // Update the chat in the database using HTTP action with authentication
-                            const updateResponse = await fetch(`${convexSiteUrl}/update-chat-messages`, {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json",
-                                    Authorization: `Bearer ${authToken}`,
-                                },
-                                body: JSON.stringify({
-                                    chatId,
-                                    messages: updatedMessages,
-                                }),
-                            });
-
-                            if (!updateResponse.ok) {
-                                const errorData = (await updateResponse.json()) as { error?: string };
-                                console.error("Failed to update chat in database:", errorData);
-                            }
-                        } catch (dbError) {
-                            console.error("Failed to update chat in database:", dbError);
-                            // Don't fail the stream, just log the error
+                            // Final update - this one we can await since streaming is done
+                            await updateChatInBackend(chatId, finalMessages, authToken);
                         }
                         break;
                 }
