@@ -279,7 +279,7 @@ export const editMessage = mutation({
 
         // Ensure we're only editing user messages
         const targetMessage = chat.messages[messageIndex];
-        if (targetMessage.role !== "user") {
+        if (targetMessage?.role !== "user") {
             throw new ConvexError("Can only edit user messages");
         }
 
@@ -375,7 +375,7 @@ export const branchChat = mutation({
 
         // Ensure we're branching from an assistant message
         const targetMessage = originalChat.messages[messageIndex];
-        if (targetMessage.role !== "assistant") {
+        if (targetMessage?.role !== "assistant") {
             throw new ConvexError("Can only branch from assistant messages");
         }
 
