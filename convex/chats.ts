@@ -480,3 +480,81 @@ export const getUserBranches = query({
         }));
     },
 });
+
+// Search chats by title and content
+export const searchChats = query({
+    args: {
+        searchTerm: v.string(),
+        limit: v.optional(v.number()),
+    },
+    handler: async (ctx, { searchTerm, limit = 10 }) => {
+        const currentUser = await getUserOrThrow(ctx);
+
+        if (!searchTerm.trim()) {
+            return [];
+        }
+
+        // Get all user's chats
+        const userChats = await ctx
+            .table("chats")
+            .filter((q) => q.eq(q.field("userId"), currentUser._id))
+            .order("desc")
+            .take(100); // Limit to recent chats for performance
+
+        // Filter and score chats based on search term
+        const searchResults = userChats
+            .map((chat) => {
+                const searchLower = searchTerm.toLowerCase();
+                let score = 0;
+                let matchedContent = "";
+                let matchType: "title" | "message" = "title";
+
+                // Check title match
+                if (chat.title.toLowerCase().includes(searchLower)) {
+                    score += 10; // Higher score for title matches
+                    matchedContent = chat.title;
+                    matchType = "title";
+                }
+
+                // Check message content matches
+                for (const message of chat.messages) {
+                    if (message.content.toLowerCase().includes(searchLower)) {
+                        score += 5; // Lower score for content matches
+                        if (!matchedContent) {
+                            // Get a snippet around the match
+                            const contentLower = message.content.toLowerCase();
+                            const matchIndex = contentLower.indexOf(searchLower);
+                            const start = Math.max(0, matchIndex - 50);
+                            const end = Math.min(message.content.length, matchIndex + searchTerm.length + 50);
+                            matchedContent = message.content.slice(start, end);
+                            if (start > 0) matchedContent = "..." + matchedContent;
+                            if (end < message.content.length) matchedContent = matchedContent + "...";
+                            matchType = "message";
+                        }
+                        break; // Only count first match per chat
+                    }
+                }
+
+                return score > 0
+                    ? {
+                          chat,
+                          score,
+                          matchedContent,
+                          matchType,
+                      }
+                    : null;
+            })
+            .filter((result): result is NonNullable<typeof result> => result !== null)
+            .sort((a, b) => b.score - a.score) // Sort by relevance score
+            .slice(0, limit);
+
+        return searchResults.map((result) => ({
+            _id: result.chat._id,
+            title: result.chat.title,
+            matchedContent: result.matchedContent,
+            matchType: result.matchType,
+            messageCount: result.chat.messages.length,
+            _creationTime: result.chat._creationTime,
+        }));
+    },
+});
