@@ -10,6 +10,8 @@ const config = {
             },
         ];
     },
+    swcMinify: true,
+    compress: true,
 };
 
 export default config;

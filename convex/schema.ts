@@ -23,13 +23,13 @@ const schema = defineEntSchema({
                 content: v.string(),
             })
         ),
-    }),
+    }).index("by_user", ["userId"]),
     userPreferences: defineEnt({
         userId: v.id("users"),
         defaultModel: v.string(),
         openRouterApiKey: v.optional(v.string()),
         userModels: v.array(v.string()),
-    }),
+    }).index("by_user", ["userId"]),
 });
 
 export default schema;
