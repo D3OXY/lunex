@@ -6,7 +6,7 @@ import { useChatService } from "@/lib/services/chat-service";
 import type { Chat } from "@/lib/stores/chat-store";
 import { useChats } from "@/lib/stores/chat-store";
 import { cn } from "@/lib/utils";
-import { MessageSquareIcon, PenLine, X, XIcon } from "lucide-react";
+import { GitBranchIcon, MessageSquareIcon, PenLine, X, XIcon } from "lucide-react";
 import type { HTMLAttributes, ReactElement } from "react";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -160,7 +160,11 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
                 ) : (
                     <>
                         <Link to={href} className="flex min-h-0 w-full items-center gap-2 overflow-hidden p-2">
-                            <MessageSquareIcon className="text-muted-foreground group-hover:text-foreground h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200" />
+                            {chat.branched ? (
+                                <GitBranchIcon className="text-muted-foreground group-hover:text-foreground h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200" />
+                            ) : (
+                                <MessageSquareIcon className="text-muted-foreground group-hover:text-foreground h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200" />
+                            )}
                             <div className="group-hover:text-foreground min-w-0 flex-1 truncate text-xs font-medium transition-colors duration-200">{chat.title}</div>
                         </Link>
 

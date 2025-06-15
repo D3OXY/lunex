@@ -363,45 +363,19 @@ export const getChatBranchPoints = query({
     },
 });
 
-// Get all branches created from a specific chat
-export const getChatBranches = query({
-    args: { originalChatId: v.id("chats") },
-    handler: async (ctx, { originalChatId }) => {
+// Get all branches created by the current user
+export const getUserBranches = query({
+    args: {},
+    handler: async (ctx) => {
         const currentUser = await getUserOrThrow(ctx);
 
-        // Verify user has access to the original chat
-        const originalChat = await ctx.table("chats").get(originalChatId);
-        if (!originalChat) {
-            throw new ConvexError("Original chat not found");
-        }
-        if (originalChat.userId !== currentUser._id) {
-            throw new ConvexError("Forbidden");
-        }
-
-        // Find all branched chats by this user that contain messages from the original chat
-        // This is a simple approach - in a more complex system, you might want to store
-        // explicit parent-child relationships
-        const allUserChats = await ctx
+        // Find all branched chats by this user
+        const branches = await ctx
             .table("chats")
             .filter((q) => q.eq(q.field("userId"), currentUser._id))
             .filter((q) => q.eq(q.field("branched"), true))
-            .collect();
-
-        // Filter branches that likely came from this chat by comparing message content
-        const branches = allUserChats.filter((chat) => {
-            if (chat.messages.length === 0 || originalChat.messages.length === 0) {
-                return false;
-            }
-
-            // Check if the first few messages match (indicating this is a branch)
-            const minLength = Math.min(chat.messages.length, originalChat.messages.length, 3);
-            for (let i = 0; i < minLength; i++) {
-                if (chat.messages[i].content !== originalChat.messages[i].content || chat.messages[i].role !== originalChat.messages[i].role) {
-                    return false;
-                }
-            }
-            return true;
-        });
+            .order("desc")
+            .take(50);
 
         return branches.map((branch) => ({
             _id: branch._id,
