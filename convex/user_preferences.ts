@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./functions";
+import { mutation, query, internalMutation, internalQuery } from "./functions";
 import { ConvexError } from "convex/values";
 import { getUserOrThrow } from "./user";
 import { DEFAULT_MODEL } from "../src/lib/models";
@@ -160,5 +160,40 @@ export const updateUserModels = mutation({
         });
 
         return { success: true };
+    },
+});
+
+// Internal query to get user preferences for a specific user (for HTTP actions)
+export const getUserPreferencesForUser = internalQuery({
+    args: {
+        userId: v.string(), // Clerk user ID
+    },
+    handler: async (ctx, { userId }) => {
+        // Get the Convex user by Clerk ID
+        const user = await ctx
+            .table("users")
+            .filter((q) => q.eq(q.field("clerkId"), userId))
+            .first();
+
+        if (!user) {
+            return null;
+        }
+
+        const preferences = await ctx
+            .table("userPreferences")
+            .filter((q) => q.eq(q.field("userId"), user._id))
+            .first();
+
+        // Return default preferences if none exist
+        if (!preferences) {
+            return {
+                userId: user._id,
+                defaultModel: DEFAULT_MODEL,
+                userModels: [],
+                openRouterApiKey: undefined,
+            };
+        }
+
+        return preferences;
     },
 });
