@@ -193,7 +193,7 @@ export default function Settings(): React.JSX.Element {
 
                                         <Card>
                                             <CardHeader>
-                                                <CardTitle>Available Models</CardTitle>
+                                                <CardTitle>Custom Models</CardTitle>
                                                 <CardDescription>Add custom model IDs that will be available in your model selector.</CardDescription>
                                             </CardHeader>
                                             <CardContent className="space-y-4">
@@ -217,12 +217,12 @@ export default function Settings(): React.JSX.Element {
                                                     ) : (
                                                         <div className="flex flex-wrap gap-2">
                                                             {userModels.map((modelId) => (
-                                                                <Badge key={modelId} variant="outline" className="flex items-center gap-2">
+                                                                <Badge key={modelId} variant="outline" className="flex h-fit items-center gap-2">
                                                                     <span className="font-mono text-xs">{modelId}</span>
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="sm"
-                                                                        className="h-auto p-0 hover:bg-transparent"
+                                                                        className="p-0 hover:bg-transparent"
                                                                         onClick={() => handleRemoveModel(modelId)}
                                                                         disabled={isLoading}
                                                                     >
@@ -247,7 +247,7 @@ export default function Settings(): React.JSX.Element {
                                             <CardContent className="space-y-4">
                                                 <Alert>
                                                     <AlertCircle className="h-4 w-4" />
-                                                    <AlertDescription className="flex flex-col gap-2">
+                                                    <AlertDescription className="inline-flex flex-row gap-2">
                                                         Your API key is stored securely and only used for your requests. You can get an API key from{" "}
                                                         <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">
                                                             OpenRouter

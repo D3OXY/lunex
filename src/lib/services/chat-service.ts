@@ -149,6 +149,8 @@ export function useChatService() {
                     title: "New Chat",
                     messages: [],
                     _creationTime: Date.now(),
+                    branched: false,
+                    visibility: "private",
                 };
                 addChatToStore(newChat);
                 setCurrentChatId(currentChatId); // Set as current chat immediately
