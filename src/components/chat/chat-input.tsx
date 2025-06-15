@@ -1,28 +1,15 @@
 /* eslint-disable @next/next/no-img-element */
-import {
-    AIInput,
-    AIInputButton,
-    AIInputModelSelect,
-    AIInputModelSelectContent,
-    AIInputModelSelectItem,
-    AIInputModelSelectTrigger,
-    AIInputModelSelectValue,
-    AIInputSubmit,
-    AIInputTextarea,
-    AIInputToolbar,
-    AIInputTools,
-} from "@/components/ui/kibo-ui/ai/input";
-import { SelectGroup, SelectLabel } from "@/components/ui/select";
+import { AIInput, AIInputButton, AIInputSubmit, AIInputTextarea, AIInputToolbar, AIInputTools } from "@/components/ui/kibo-ui/ai/input";
 import { useChatStore } from "@/lib/stores/chat-store";
-import { Brain, CodeIcon, GlobeIcon, ImageIcon, MicIcon, SendIcon, ShieldCheck, Sparkles, UserIcon } from "lucide-react";
+import { GlobeIcon, MicIcon, SendIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { getModelsByProvider, type ModelDefinition, type ModelFeatures } from "@/lib/models";
 import { FileUpload } from "@/components/chat/file-upload";
+import { ModelPicker } from "@/components/chat/model-picker";
 
 export const ChatInput = ({ chatId, disabled, onSubmit }: { chatId: Id<"chats"> | null; disabled: boolean; onSubmit: (e: React.FormEvent) => void }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const { query, setQuery, selectedModel, setSelectedModel, webSearchEnabled, setWebSearchEnabled, attachments, clearAttachments } = useChatStore();
+    const { query, setQuery, webSearchEnabled, setWebSearchEnabled, attachments, clearAttachments } = useChatStore();
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -122,34 +109,7 @@ export const ChatInput = ({ chatId, disabled, onSubmit }: { chatId: Id<"chats"> 
                             <GlobeIcon size={16} />
                             <span>Search</span>
                         </AIInputButton>
-                        <AIInputModelSelect value={selectedModel} onValueChange={setSelectedModel}>
-                            <AIInputModelSelectTrigger>
-                                <AIInputModelSelectValue placeholder="Select a model" />
-                            </AIInputModelSelectTrigger>
-                            <AIInputModelSelectContent className="max-h-[500px] overflow-y-auto">
-                                {Object.entries(getModelsByProvider()).map(([providerName, modelsInProvider]) => (
-                                    <SelectGroup key={providerName}>
-                                        <SelectLabel>{providerName}</SelectLabel>
-                                        {Object.entries(modelsInProvider).map(([modelId, model]: [string, ModelDefinition]) => {
-                                            const features: ModelFeatures = model.features ?? {};
-                                            return (
-                                                <AIInputModelSelectItem key={modelId} value={modelId}>
-                                                    <div className="flex items-center gap-2">
-                                                        {model.name}
-                                                        {features.imageInput && <ImageIcon size={14} className="text-muted-foreground" />}
-                                                        {features.reasoning && <Brain size={14} className="text-muted-foreground" />}
-                                                        {features.selfModerated && <ShieldCheck size={14} className="text-muted-foreground" />}
-                                                        {features.free && <Sparkles size={14} className="text-muted-foreground" />}
-                                                        {features.coding && <CodeIcon size={14} className="text-muted-foreground" />}
-                                                        {features.userModel && <UserIcon size={14} className="text-muted-foreground" />}
-                                                    </div>
-                                                </AIInputModelSelectItem>
-                                            );
-                                        })}
-                                    </SelectGroup>
-                                ))}
-                            </AIInputModelSelectContent>
-                        </AIInputModelSelect>
+                        <ModelPicker />
                     </AIInputTools>
                     <AIInputSubmit disabled={(!query.trim() && attachments.length === 0) || disabled}>
                         <SendIcon className="h-4 w-4" />
