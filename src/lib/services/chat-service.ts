@@ -2,6 +2,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useChatStore, type Chat } from "../stores/chat-store";
+import { useAuth } from "@clerk/nextjs";
 
 interface Message {
     role: "user" | "assistant";
@@ -28,6 +29,7 @@ const streamChatResponse = async (
     messages: Message[],
     chatId: Id<"chats">,
     modelId: string,
+    authToken: string,
     onStream?: (content: string) => void,
     onReasoning?: (content: string) => void,
     onComplete?: (fullResponse: string) => void,
@@ -36,7 +38,7 @@ const streamChatResponse = async (
     const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, chatId, modelId }),
+        body: JSON.stringify({ messages, chatId, modelId, authToken }),
     });
 
     if (!response.ok) {
@@ -95,9 +97,9 @@ const streamChatResponse = async (
 
 export function useChatService() {
     const createChat = useMutation(api.chats.createChat);
-    const updateMessages = useMutation(api.chats.updateMessages);
     const updateChatTitle = useMutation(api.chats.updateChatTitle);
     const deleteChat = useMutation(api.chats.deleteChat);
+    const { getToken } = useAuth();
 
     const { setIsStreaming, addMessage: addMessageToStore, updateMessage, updateMessageReasoning, addChat: addChatToStore, getCurrentChat, setCurrentChatId } = useChatStore();
 
@@ -137,6 +139,12 @@ export function useChatService() {
             throw new Error("Chat ID not available");
         }
 
+        // Get auth token for API calls with Convex audience
+        const authToken = await getToken({ template: "convex" });
+        if (!authToken) {
+            throw new Error("Authentication token not available");
+        }
+
         // Add user message to the chat
         addMessageToStore(currentChatId, { role: "user", content });
 
@@ -163,6 +171,7 @@ export function useChatService() {
                     messages,
                     currentChatId,
                     modelId,
+                    authToken,
                     (chunk: string) => {
                         fullResponse += chunk;
                         const now = Date.now();
@@ -177,13 +186,8 @@ export function useChatService() {
                     (response) => {
                         setIsStreaming(false);
                         updateMessage(currentChatId, assistantIndex, response);
-
-                        // Persist to database
-                        const sanitized: Message[] = baseMessages.map((m) => ({ role: m.role, content: m.content }));
-                        void updateMessages({
-                            chatId: currentChatId,
-                            messages: [...sanitized, { role: "assistant", content: response }],
-                        });
+                        // Database update is now handled by the backend
+                        // No need to call updateMessages from frontend
                     },
                     (error: string) => {
                         console.error("Stream error:", error);

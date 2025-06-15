@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, action, internalMutation } from "./functions";
+import { mutation, query, action, internalMutation, internalQuery } from "./functions";
 import { ConvexError } from "convex/values";
 import { getUserOrThrow } from "./user";
 import { api, internal } from "./_generated/api";
@@ -116,7 +116,33 @@ export const generateAndUpdateTitle = action({
     },
 });
 
+// Action to update chat messages (called from backend)
+export const updateChatMessages = action({
+    args: {
+        chatId: v.id("chats"),
+        messages: v.array(
+            v.object({
+                role: v.union(v.literal("user"), v.literal("assistant")),
+                content: v.string(),
+            })
+        ),
+    },
+    handler: async (ctx, { chatId, messages }) => {
+        try {
+            await ctx.runMutation(internal.chats.internalUpdateMessages, {
+                chatId,
+                messages,
+            });
+            return { success: true };
+        } catch (error) {
+            console.error("Failed to update chat messages:", error);
+            throw error;
+        }
+    },
+});
+
 // Add a message to a chat
+// TODO: Remove this
 export const addMessage = mutation({
     args: {
         chatId: v.id("chats"),
@@ -209,7 +235,59 @@ export const deleteChat = mutation({
     },
 });
 
-// Update messages in a chat (for streaming updates)
+// Internal query to get chat for a specific user (for authentication)
+export const getChatForUser = internalQuery({
+    args: {
+        chatId: v.id("chats"),
+        userId: v.string(), // Clerk user ID
+    },
+    handler: async (ctx, { chatId, userId }) => {
+        const chat = await ctx.table("chats").get(chatId);
+        if (!chat) {
+            return null;
+        }
+
+        // Get the Convex user by Clerk ID
+        const user = await ctx
+            .table("users")
+            .filter((q) => q.eq(q.field("clerkId"), userId))
+            .first();
+
+        if (!user || chat.userId !== user._id) {
+            return null;
+        }
+
+        return chat;
+    },
+});
+
+// Internal mutation to update messages (called from backend)
+export const internalUpdateMessages = internalMutation({
+    args: {
+        chatId: v.id("chats"),
+        messages: v.array(
+            v.object({
+                role: v.union(v.literal("user"), v.literal("assistant")),
+                content: v.string(),
+            })
+        ),
+    },
+    handler: async (ctx, { chatId, messages }) => {
+        const chat = await ctx.table("chats").get(chatId);
+        if (!chat) {
+            throw new ConvexError("Chat not found");
+        }
+
+        await ctx.table("chats").getX(chatId).patch({
+            messages,
+        });
+
+        return { success: true };
+    },
+});
+
+// Update messages in a chat (for streaming updates) - DEPRECATED
+// This will be removed once backend handles all updates
 export const updateMessages = mutation({
     args: {
         chatId: v.id("chats"),

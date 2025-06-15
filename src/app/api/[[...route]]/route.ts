@@ -31,8 +31,8 @@ const SYSTEM_PROMPT =
 
 // Chat streaming endpoint with OpenRouter
 app.post("/chat/stream", async (c) => {
-    const body: { messages?: Array<{ role: string; content: string }>; chatId?: string; modelId?: string } = await c.req.json();
-    const { messages, chatId, modelId } = body;
+    const body: { messages?: Array<{ role: string; content: string }>; chatId?: string; modelId?: string; authToken?: string } = await c.req.json();
+    const { messages, chatId, modelId, authToken } = body;
 
     return stream(c, async (stream) => {
         try {
@@ -41,6 +41,26 @@ app.post("/chat/stream", async (c) => {
                     JSON.stringify({
                         type: "error",
                         error: "Messages array is required",
+                    }) + "\n"
+                );
+                return;
+            }
+
+            if (!chatId) {
+                await stream.write(
+                    JSON.stringify({
+                        type: "error",
+                        error: "Chat ID is required",
+                    }) + "\n"
+                );
+                return;
+            }
+
+            if (!authToken) {
+                await stream.write(
+                    JSON.stringify({
+                        type: "error",
+                        error: "Authentication token is required",
                     }) + "\n"
                 );
                 return;
@@ -72,10 +92,13 @@ app.post("/chat/stream", async (c) => {
             // Send initial response
             await stream.write(JSON.stringify({ type: "start", chatId, supportsReasoning }) + "\n");
 
+            let fullResponse = "";
+
             // Stream the response using AI SDK's built-in reasoning support
             for await (const part of result.fullStream) {
                 switch (part.type) {
                     case "text-delta":
+                        fullResponse += part.textDelta;
                         await stream.write(
                             JSON.stringify({
                                 type: "delta",
@@ -94,7 +117,38 @@ app.post("/chat/stream", async (c) => {
                         }
                         break;
                     case "finish":
-                        // Stream is complete
+                        // Stream is complete - now update the database via HTTP action
+                        try {
+                            // Prepare the complete conversation including the new assistant response
+                            const updatedMessages = [
+                                ...messages.map((msg) => ({ role: msg.role as "user" | "assistant", content: msg.content })),
+                                { role: "assistant" as const, content: fullResponse },
+                            ];
+
+                            // Get the Convex deployment URL
+                            const convexSiteUrl = env.NEXT_PUBLIC_CONVEX_URL.replace(".convex.cloud", ".convex.site");
+
+                            // Update the chat in the database using HTTP action with authentication
+                            const updateResponse = await fetch(`${convexSiteUrl}/update-chat-messages`, {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    Authorization: `Bearer ${authToken}`,
+                                },
+                                body: JSON.stringify({
+                                    chatId,
+                                    messages: updatedMessages,
+                                }),
+                            });
+
+                            if (!updateResponse.ok) {
+                                const errorData = (await updateResponse.json()) as { error?: string };
+                                console.error("Failed to update chat in database:", errorData);
+                            }
+                        } catch (dbError) {
+                            console.error("Failed to update chat in database:", dbError);
+                            // Don't fail the stream, just log the error
+                        }
                         break;
                 }
             }
