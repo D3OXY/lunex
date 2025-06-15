@@ -19,10 +19,11 @@ import { AIResponse } from "@/components/ui/kibo-ui/ai/response";
 import { ChatInput } from "@/components/chat/chat-input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUser } from "@clerk/nextjs";
-import { GitBranch, GlobeIcon, MoreHorizontal } from "lucide-react";
+import { Copy, Edit3, GitBranch, GlobeIcon } from "lucide-react";
 import { toast } from "sonner";
 
 interface ChatInterfaceProps {
@@ -34,6 +35,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showBranchDialog, setShowBranchDialog] = useState(false);
     const [selectedMessageIndex, setSelectedMessageIndex] = useState<number | null>(null);
+    const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
+    const [editedContent, setEditedContent] = useState("");
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -54,6 +57,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
     // Branching functionality
     const branchChat = useMutation(api.chats.branchChat);
+    const updateChatMessages = useMutation(api.chats.updateChatMessages);
 
     const navigate = useNavigate();
 
@@ -121,6 +125,60 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         }
     };
 
+    const handleCopyResponse = async (content: string): Promise<void> => {
+        try {
+            await navigator.clipboard.writeText(content);
+            toast.success("Response copied to clipboard");
+        } catch (error) {
+            console.error("Failed to copy to clipboard:", error);
+            toast.error("Failed to copy to clipboard");
+        }
+    };
+
+    const handleEditMessage = (messageIndex: number, currentContent: string): void => {
+        setEditingMessageIndex(messageIndex);
+        setEditedContent(currentContent);
+    };
+
+    const handleSaveEdit = async (): Promise<void> => {
+        if (!chatId || editingMessageIndex === null || !currentUser?._id) return;
+
+        setIsSubmitting(true);
+        try {
+            // Truncate messages after the edited message
+            const truncatedMessages = currentChat?.messages.slice(0, editingMessageIndex) ?? [];
+
+            // Update the chat in the database with truncated messages
+            await updateChatMessages({
+                chatId,
+                messages: truncatedMessages.map((msg) => ({
+                    role: msg.role,
+                    content: msg.content,
+                })),
+            });
+
+            // Update local store
+            const { updateChat } = useChatStore.getState();
+            updateChat(chatId, { messages: truncatedMessages });
+
+            // Send the edited message
+            await sendMessage(editedContent.trim(), selectedModel, chatId, currentUser._id);
+
+            setEditingMessageIndex(null);
+            setEditedContent("");
+        } catch (error) {
+            console.error("Failed to regenerate response:", error);
+            toast.error("Failed to regenerate response");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleCancelEdit = (): void => {
+        setEditingMessageIndex(null);
+        setEditedContent("");
+    };
+
     const allMessages = currentChat?.messages ?? [];
 
     if (isLoading || !currentUser) {
@@ -132,108 +190,165 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     }
 
     return (
-        <div className="flex h-full flex-col">
-            {/* Messages */}
-            <div className="flex-1 overflow-hidden">
-                <ScrollArea className="h-full px-4">
-                    <AIBranch className="h-full">
-                        <AIBranchMessages>
-                            <div className="space-y-4 py-4">
-                                {allMessages.length === 0 ? (
-                                    <div className="text-muted-foreground flex h-32 items-center justify-center">Start a conversation by typing a message below</div>
-                                ) : (
-                                    allMessages.map((msg, index) => (
-                                        <AIMessage key={`${index}-${msg.role}`} from={msg.role}>
-                                            <AIMessageAvatar
-                                                src={msg.role === "user" ? (clerkUser?.imageUrl ?? "") : ""}
-                                                name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "AI"}
-                                            />
-                                            <AIMessageContent>
-                                                {msg.role === "assistant" && msg.reasoning && (
-                                                    <ReasoningDisplay reasoning={msg.reasoning} isStreaming={msg.isStreaming && isStreaming} />
-                                                )}
-                                                {msg.role === "assistant" ? (
-                                                    <AIResponse className="tracking-wide">{msg.content}</AIResponse>
-                                                ) : (
-                                                    <div className="text-base tracking-wide">{msg.content}</div>
-                                                )}
-                                                {msg.isStreaming && isStreaming && (
-                                                    <div className="mt-2 flex items-center gap-1">
-                                                        <div className="h-2 w-2 animate-pulse rounded-full bg-current" />
-                                                        <span className="text-xs opacity-70">Generating...</span>
-                                                    </div>
-                                                )}
-                                                {/* Branch button for assistant messages */}
-                                                {msg.role === "assistant" && !msg.isStreaming && chatId && (
-                                                    <div className="mt-2 flex justify-end">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                                    <MoreHorizontal className="h-4 w-4" />
+        <TooltipProvider>
+            <div className="flex h-full flex-col">
+                {/* Messages */}
+                <div className="flex-1 overflow-hidden">
+                    <ScrollArea className="h-full px-4">
+                        <AIBranch className="h-full">
+                            <AIBranchMessages>
+                                <div className="space-y-4 py-4">
+                                    {allMessages.length === 0 ? (
+                                        <div className="text-muted-foreground flex h-32 items-center justify-center">Start a conversation by typing a message below</div>
+                                    ) : (
+                                        allMessages.map((msg, index) => (
+                                            <AIMessage key={`${index}-${msg.role}`} from={msg.role}>
+                                                <AIMessageAvatar
+                                                    src={msg.role === "user" ? (clerkUser?.imageUrl ?? "") : ""}
+                                                    name={msg.role === "user" ? (clerkUser?.fullName ?? "User") : "AI"}
+                                                />
+                                                <AIMessageContent>
+                                                    {msg.role === "assistant" && msg.reasoning && (
+                                                        <ReasoningDisplay reasoning={msg.reasoning} isStreaming={msg.isStreaming && isStreaming} />
+                                                    )}
+                                                    {editingMessageIndex === index && msg.role === "user" ? (
+                                                        <div className="space-y-2">
+                                                            <Textarea
+                                                                value={editedContent}
+                                                                onChange={(e) => setEditedContent(e.target.value)}
+                                                                className="min-h-[100px]"
+                                                                placeholder="Edit your message..."
+                                                            />
+                                                            <div className="flex gap-2">
+                                                                <Button size="sm" onClick={handleSaveEdit} disabled={!editedContent.trim() || isSubmitting}>
+                                                                    Save & Regenerate
                                                                 </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuItem onClick={() => handleBranchFromMessage(index)}>
-                                                                    <GitBranch className="mr-2 h-4 w-4" />
-                                                                    Branch from here
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </div>
-                                                )}
-                                            </AIMessageContent>
-                                        </AIMessage>
-                                    ))
-                                )}
-                                <div ref={messagesEndRef} />
-                            </div>
-                        </AIBranchMessages>
+                                                                <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                                                                    Cancel
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ) : msg.role === "assistant" ? (
+                                                        <AIResponse className="tracking-wide">{msg.content}</AIResponse>
+                                                    ) : (
+                                                        <div className="text-base tracking-wide">{msg.content}</div>
+                                                    )}
+                                                    {msg.isStreaming && isStreaming && (
+                                                        <div className="mt-2 flex items-center gap-1">
+                                                            <div className="h-2 w-2 animate-pulse rounded-full bg-current" />
+                                                            <span className="text-xs opacity-70">Generating...</span>
+                                                        </div>
+                                                    )}
+                                                    {/* Action buttons - outside the chat bubble */}
+                                                    {!msg.isStreaming && chatId && editingMessageIndex !== index && (
+                                                        <div className="mt-1 flex justify-end gap-1 px-2">
+                                                            {msg.role === "assistant" && (
+                                                                <>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                className="h-7 w-7 p-0 opacity-50 hover:opacity-100"
+                                                                                onClick={() => handleCopyResponse(msg.content)}
+                                                                            >
+                                                                                <Copy className="h-3.5 w-3.5" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>
+                                                                            <p>Copy response</p>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                className="h-7 w-7 p-0 opacity-50 hover:opacity-100"
+                                                                                onClick={() => handleBranchFromMessage(index)}
+                                                                            >
+                                                                                <GitBranch className="h-3.5 w-3.5" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>
+                                                                            <p>Branch from here</p>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                </>
+                                                            )}
+                                                            {msg.role === "user" && (
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="h-7 w-7 p-0 opacity-50 hover:opacity-100"
+                                                                            onClick={() => handleEditMessage(index, msg.content)}
+                                                                        >
+                                                                            <Edit3 className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <p>Edit & regenerate</p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </AIMessageContent>
+                                            </AIMessage>
+                                        ))
+                                    )}
+                                    <div ref={messagesEndRef} />
+                                </div>
+                            </AIBranchMessages>
 
-                        {/* Branch Navigation (hidden when only one branch) */}
-                        <AIBranchSelector from="assistant" className="py-2">
-                            <AIBranchPrevious />
-                            <AIBranchPage />
-                            <AIBranchNext />
-                        </AIBranchSelector>
-                    </AIBranch>
-                </ScrollArea>
-            </div>
-
-            {/* Input & Suggestions - Fixed at bottom */}
-            <div className="bg-background flex-shrink-0">
-                {webSearchEnabled && (
-                    <div className="border-t px-4 py-2">
-                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                            <GlobeIcon size={14} />
-                            <span>Web search enabled - responses will include real-time information</span>
-                        </div>
-                    </div>
-                )}
-                <div className="">
-                    <ChatInput chatId={chatId ?? null} disabled={isSubmitting || isStreaming} onSubmit={handleSubmit} />
+                            {/* Branch Navigation (hidden when only one branch) */}
+                            <AIBranchSelector from="assistant" className="py-2">
+                                <AIBranchPrevious />
+                                <AIBranchPage />
+                                <AIBranchNext />
+                            </AIBranchSelector>
+                        </AIBranch>
+                    </ScrollArea>
                 </div>
-            </div>
 
-            {/* Branch confirmation dialog */}
-            <Dialog open={showBranchDialog} onOpenChange={setShowBranchDialog}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Create Branch</DialogTitle>
-                        <DialogDescription>
-                            This will create a new conversation starting from the selected message. You can continue the conversation from that point in a separate branch.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setShowBranchDialog(false)}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleCreateBranch}>
-                            <GitBranch className="mr-2 h-4 w-4" />
-                            Create Branch
-                        </Button>
+                {/* Input & Suggestions - Fixed at bottom */}
+                <div className="bg-background flex-shrink-0">
+                    {webSearchEnabled && (
+                        <div className="border-t px-4 py-2">
+                            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                                <GlobeIcon size={14} />
+                                <span>Web search enabled - responses will include real-time information</span>
+                            </div>
+                        </div>
+                    )}
+                    <div className="">
+                        <ChatInput chatId={chatId ?? null} disabled={isSubmitting || isStreaming} onSubmit={handleSubmit} />
                     </div>
-                </DialogContent>
-            </Dialog>
-        </div>
+                </div>
+
+                {/* Branch confirmation dialog */}
+                <Dialog open={showBranchDialog} onOpenChange={setShowBranchDialog}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Create Branch</DialogTitle>
+                            <DialogDescription>
+                                This will create a new conversation starting from the selected message. You can continue the conversation from that point in a separate branch.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setShowBranchDialog(false)}>
+                                Cancel
+                            </Button>
+                            <Button onClick={handleCreateBranch}>
+                                <GitBranch className="mr-2 h-4 w-4" />
+                                Create Branch
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        </TooltipProvider>
     );
 }

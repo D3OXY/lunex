@@ -256,6 +256,35 @@ export const updateChatVisibility = mutation({
     },
 });
 
+// Update chat messages (for editing functionality)
+export const updateChatMessages = mutation({
+    args: {
+        chatId: v.id("chats"),
+        messages: v.array(
+            v.object({
+                role: v.union(v.literal("user"), v.literal("assistant")),
+                content: v.string(),
+            })
+        ),
+    },
+    handler: async (ctx, { chatId, messages }) => {
+        const currentUser = await getUserOrThrow(ctx);
+        const chat = await ctx.table("chats").get(chatId);
+        if (!chat) {
+            throw new ConvexError("Chat not found");
+        }
+        if (chat.userId !== currentUser._id) {
+            throw new ConvexError("Forbidden");
+        }
+
+        await ctx.table("chats").getX(chatId).patch({
+            messages,
+        });
+
+        return { success: true };
+    },
+});
+
 // Branch a chat from a specific assistant message
 export const branchChat = mutation({
     args: {
