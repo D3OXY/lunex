@@ -7,6 +7,7 @@
         "mistralai",
         "openrouter",
         "qwen",
-        "svix"
+        "svix",
+        "uploadthing"
     ]
 }

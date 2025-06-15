@@ -10,6 +10,14 @@ interface Message {
     reasoning?: string;
     id?: string;
     isStreaming?: boolean;
+    attachments?: FileAttachment[];
+}
+
+export interface FileAttachment {
+    url: string;
+    name: string;
+    size: number;
+    type: "image" | "pdf";
 }
 
 export interface Chat {
@@ -30,6 +38,7 @@ interface ChatState {
     isStreaming: boolean;
     streamingMessage: string;
     webSearchEnabled: boolean;
+    attachments: FileAttachment[];
 
     // Stream priority tracking
     activeStreamChatId: Id<"chats"> | null;
@@ -45,6 +54,9 @@ interface ChatState {
     updateChat: (chatId: Id<"chats">, updates: Partial<Chat>) => void;
     removeChat: (chatId: Id<"chats">) => void;
     setWebSearchEnabled: (enabled: boolean) => void;
+    addAttachment: (attachment: FileAttachment) => void;
+    removeAttachment: (index: number) => void;
+    clearAttachments: () => void;
 
     // Message actions
     addMessage: (chatId: Id<"chats">, message: Message) => void;
@@ -74,6 +86,7 @@ export const useChatStore = create<ChatState>()(
         isStreaming: false,
         streamingMessage: "",
         webSearchEnabled: false,
+        attachments: [],
         activeStreamChatId: null,
         streamingMessageIndex: null,
 
@@ -152,6 +165,18 @@ export const useChatStore = create<ChatState>()(
             })),
 
         setWebSearchEnabled: (enabled) => set({ webSearchEnabled: enabled }),
+
+        addAttachment: (attachment) =>
+            set((state) => ({
+                attachments: [...state.attachments, attachment],
+            })),
+
+        removeAttachment: (index) =>
+            set((state) => ({
+                attachments: state.attachments.filter((_, i) => i !== index),
+            })),
+
+        clearAttachments: () => set({ attachments: [] }),
 
         // Message actions
         addMessage: (chatId, message) =>

@@ -8,6 +8,7 @@ export const env = createEnv({
         CLERK_SECRET_KEY: z.string(),
         CLERK_WEBHOOK_SECRET: z.string(),
         OPENROUTER_API_KEY: z.string(),
+        UPLOADTHING_TOKEN: z.string(),
     },
     client: {
         NEXT_PUBLIC_CONVEX_URL: z.string().url(),
@@ -23,6 +24,7 @@ export const env = createEnv({
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
         CLERK_WEBHOOK_SECRET: process.env.CLERK_WEBHOOK_SECRET,
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+        UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN,
     },
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,
     emptyStringAsUndefined: true,
