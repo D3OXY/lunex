@@ -65,7 +65,16 @@ const updateChatInBackend = async (chatId: string, messages: Array<{ role: "user
 // Chat streaming endpoint with OpenRouter
 app.post("/chat/stream", async (c) => {
     const body: {
-        messages?: Array<{ role: string; content: string }>;
+        messages?: Array<{
+            role: string;
+            content:
+                | string
+                | Array<{
+                      type: "text" | "image_url";
+                      text?: string;
+                      image_url?: { url: string };
+                  }>;
+        }>;
         chatId?: string;
         modelId?: string;
         authToken?: string;
@@ -105,13 +114,36 @@ app.post("/chat/stream", async (c) => {
                 return;
             }
 
-            // Prepend system prompt to enforce code block formatting
+            // Convert messages to CoreMessage format, handling both string and multi-modal content
             const coreMessages: CoreMessage[] = [
                 { role: "system", content: SYSTEM_PROMPT },
-                ...messages.map((msg) => ({
-                    role: msg.role as "user" | "assistant" | "system",
-                    content: msg.content,
-                })),
+                ...messages.map((msg) => {
+                    const role = msg.role as "user" | "assistant" | "system";
+
+                    // Handle multi-modal content for user messages
+                    if (role === "user" && Array.isArray(msg.content)) {
+                        // Convert our format to AI SDK format
+                        const content = msg.content.map((part) => {
+                            if (part.type === "text") {
+                                return { type: "text" as const, text: part.text ?? "" };
+                            } else if (part.type === "image_url") {
+                                return {
+                                    type: "image" as const,
+                                    image: new URL(part.image_url?.url ?? ""),
+                                };
+                            }
+                            return { type: "text" as const, text: "" };
+                        });
+
+                        return { role, content };
+                    }
+
+                    // Handle simple string content
+                    return {
+                        role,
+                        content: typeof msg.content === "string" ? msg.content : "",
+                    };
+                }),
             ];
 
             // check if modelId is a valid model id
@@ -139,8 +171,24 @@ app.post("/chat/stream", async (c) => {
             let lastUpdateTime = Date.now();
             let isUpdating = false;
 
-            // Prepare base messages for incremental updates
-            const baseMessages = messages.map((msg) => ({ role: msg.role as "user" | "assistant", content: msg.content }));
+            // Prepare base messages for incremental updates (convert to simple format for storage)
+            const baseMessages = messages.map((msg) => ({
+                role: msg.role as "user" | "assistant",
+                content:
+                    typeof msg.content === "string"
+                        ? msg.content
+                        : msg.content
+                              .map((part) => {
+                                  if (part.type === "text") {
+                                      return part.text ?? "";
+                                  } else if (part.type === "image_url") {
+                                      return `[Image: ${part.image_url?.url ?? ""}]`;
+                                  }
+                                  return "";
+                              })
+                              .join(" ")
+                              .trim(),
+            }));
 
             // Stream the response using AI SDK's built-in reasoning support
             for await (const part of result.fullStream) {
