@@ -171,10 +171,13 @@ app.post("/chat/stream", async (c) => {
             }
 
             // Fetch user preferences and chat history from Convex
-            const [userPreferences, historyMessages] = await Promise.all([
+            const [userPreferences, allChatMessages] = await Promise.all([
                 fetchUserPreferences(authToken),
-                fetchChatMessages(chatId, authToken).then((messages) => messages.slice(-MAX_HISTORY_MESSAGES)),
+                fetchChatMessages(chatId, authToken), // Get ALL messages for database operations
             ]);
+
+            // Limit history for LLM context only
+            const historyMessages = allChatMessages.slice(-MAX_HISTORY_MESSAGES);
 
             // Get all available models (built-in + user models)
             const userModels = userPreferences?.userModels ?? [];
@@ -300,7 +303,8 @@ app.post("/chat/stream", async (c) => {
                               .trim(),
             }));
 
-            const baseMessages = [...historyMessages, ...newUserMessages];
+            // Use ALL chat messages for database operations to preserve full history
+            const baseMessages = [...allChatMessages, ...newUserMessages];
 
             // Stream the response using AI SDK's built-in reasoning support
             try {
