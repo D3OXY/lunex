@@ -7,7 +7,11 @@ import { MessageSquareIcon } from "lucide-react";
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
     return (
         <div className="flex min-h-screen flex-col">
-            <Authenticated>{children}</Authenticated>
+            <Authenticated>
+                {/* Sync Context */}
+                {children}
+                {/* End Sync Context */}
+            </Authenticated>
             <Unauthenticated>
                 <div className="from-background to-muted flex min-h-screen items-center justify-center bg-gradient-to-br">
                     <div className="bg-card mx-auto max-w-md space-y-6 rounded-lg border p-8 shadow-lg">
