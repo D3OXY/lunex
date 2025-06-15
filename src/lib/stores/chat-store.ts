@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import type { Id } from "../../../convex/_generated/dataModel";
