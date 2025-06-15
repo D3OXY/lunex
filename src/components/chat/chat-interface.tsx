@@ -1,23 +1,29 @@
 "use client";
 
+import { useSyncContext } from "@/app/context/sync-context";
 import { useChatService } from "@/lib/services/chat-service";
 import { useChatStore, useCurrentChat, useIsStreaming, useWebSearchEnabled } from "@/lib/stores/chat-store";
+import { useMutation } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { useSyncContext } from "@/app/context/sync-context";
 
 // AI Components
+import { ReasoningDisplay } from "@/components/reasoning-display";
 import { AIBranch, AIBranchMessages, AIBranchNext, AIBranchPage, AIBranchPrevious, AIBranchSelector } from "@/components/ui/kibo-ui/ai/branch";
 import { AIMessage, AIMessageAvatar, AIMessageContent } from "@/components/ui/kibo-ui/ai/message";
 import { AIResponse } from "@/components/ui/kibo-ui/ai/response";
-import { ReasoningDisplay } from "@/components/reasoning-display";
 
 // UI Components
 import { ChatInput } from "@/components/chat/chat-input";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@clerk/nextjs";
-import { GlobeIcon } from "lucide-react";
+import { GitBranch, GlobeIcon, MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 
 interface ChatInterfaceProps {
     chatId?: Id<"chats">;
@@ -26,6 +32,8 @@ interface ChatInterfaceProps {
 export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element {
     const { query, setQuery, selectedModel } = useChatStore();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showBranchDialog, setShowBranchDialog] = useState(false);
+    const [selectedMessageIndex, setSelectedMessageIndex] = useState<number | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -43,6 +51,9 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
     // Clerk user hook (for avatar and display name)
     const { user: clerkUser } = useUser();
+
+    // Branching functionality
+    const branchChat = useMutation(api.chats.branchChat);
 
     const navigate = useNavigate();
 
@@ -81,6 +92,32 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
             console.error("Failed to send message:", error);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleBranchFromMessage = (messageIndex: number): void => {
+        setSelectedMessageIndex(messageIndex);
+        setShowBranchDialog(true);
+    };
+
+    const handleCreateBranch = async (): Promise<void> => {
+        if (!chatId || selectedMessageIndex === null) return;
+
+        try {
+            const branchedChatId = await branchChat({
+                chatId,
+                messageIndex: selectedMessageIndex,
+            });
+
+            toast.success("Branch created successfully");
+            setShowBranchDialog(false);
+            setSelectedMessageIndex(null);
+
+            // Navigate to the new branch
+            void navigate(`/chat/${branchedChatId}`);
+        } catch (error) {
+            console.error("Failed to create branch:", error);
+            toast.error("Failed to create branch");
         }
     };
 
@@ -126,6 +163,24 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                                         <span className="text-xs opacity-70">Generating...</span>
                                                     </div>
                                                 )}
+                                                {/* Branch button for assistant messages */}
+                                                {msg.role === "assistant" && !msg.isStreaming && chatId && (
+                                                    <div className="mt-2 flex justify-end">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onClick={() => handleBranchFromMessage(index)}>
+                                                                    <GitBranch className="mr-2 h-4 w-4" />
+                                                                    Branch from here
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                )}
                                             </AIMessageContent>
                                         </AIMessage>
                                     ))
@@ -158,6 +213,27 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                     <ChatInput chatId={chatId ?? null} disabled={isSubmitting || isStreaming} onSubmit={handleSubmit} />
                 </div>
             </div>
+
+            {/* Branch confirmation dialog */}
+            <Dialog open={showBranchDialog} onOpenChange={setShowBranchDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Create Branch</DialogTitle>
+                        <DialogDescription>
+                            This will create a new conversation starting from the selected message. You can continue the conversation from that point in a separate branch.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setShowBranchDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleCreateBranch}>
+                            <GitBranch className="mr-2 h-4 w-4" />
+                            Create Branch
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
