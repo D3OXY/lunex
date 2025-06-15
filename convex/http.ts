@@ -13,13 +13,15 @@ http.route({
     handler: clerkUserWebhookHandler,
 });
 
-// HTTP action to update chat messages with authentication
+// HTTP action to update chat messages with authentication and authorization
+// This is called from the backend streaming API to persist chat messages
+// after the AI response is complete, ensuring proper user ownership verification
 http.route({
     path: "/update-chat-messages",
     method: "POST",
     handler: httpAction(async (ctx, request) => {
         try {
-            // Get the authorization header
+            // Verify authorization header is present
             const authHeader = request.headers.get("Authorization");
             if (!authHeader?.startsWith("Bearer ")) {
                 return new Response(JSON.stringify({ error: "Missing or invalid authorization header" }), {
@@ -28,7 +30,7 @@ http.route({
                 });
             }
 
-            // Verify the user identity using the JWT token
+            // Verify the user identity using the JWT token from Clerk
             const identity = await ctx.auth.getUserIdentity();
             if (!identity) {
                 return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -37,7 +39,7 @@ http.route({
                 });
             }
 
-            // Parse the request body
+            // Parse and validate request body
             const { chatId, messages } = (await request.json()) as { chatId: Id<"chats">; messages: CoreMessage[] };
 
             if (!chatId || !messages) {
@@ -47,10 +49,10 @@ http.route({
                 });
             }
 
-            // Verify that the user owns the chat by running a query
+            // Verify that the authenticated user owns the chat
             const chat = await ctx.runQuery(internal.chats.getChatForUser, {
                 chatId,
-                userId: identity.subject,
+                userId: identity.subject, // Clerk user ID
             });
 
             if (!chat) {

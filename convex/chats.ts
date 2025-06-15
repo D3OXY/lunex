@@ -116,63 +116,6 @@ export const generateAndUpdateTitle = action({
     },
 });
 
-// Action to update chat messages (called from backend)
-export const updateChatMessages = action({
-    args: {
-        chatId: v.id("chats"),
-        messages: v.array(
-            v.object({
-                role: v.union(v.literal("user"), v.literal("assistant")),
-                content: v.string(),
-            })
-        ),
-    },
-    handler: async (ctx, { chatId, messages }) => {
-        try {
-            await ctx.runMutation(internal.chats.internalUpdateMessages, {
-                chatId,
-                messages,
-            });
-            return { success: true };
-        } catch (error) {
-            console.error("Failed to update chat messages:", error);
-            throw error;
-        }
-    },
-});
-
-// Add a message to a chat
-// TODO: Remove this
-export const addMessage = mutation({
-    args: {
-        chatId: v.id("chats"),
-        role: v.union(v.literal("user"), v.literal("assistant")),
-        content: v.string(),
-    },
-    handler: async (ctx, { chatId, role, content }) => {
-        const currentUser = await getUserOrThrow(ctx);
-        const chat = await ctx.table("chats").get(chatId);
-        if (!chat) {
-            throw new ConvexError("Chat not found");
-        }
-        if (chat.userId !== currentUser._id) {
-            throw new ConvexError("Forbidden");
-        }
-        if (!chat) {
-            throw new ConvexError("Chat not found");
-        }
-
-        const newMessage = { role, content };
-        const updatedMessages = [...chat.messages, newMessage];
-
-        await ctx.table("chats").getX(chatId).patch({
-            messages: updatedMessages,
-        });
-
-        return newMessage;
-    },
-});
-
 // Update chat title
 export const updateChatTitle = mutation({
     args: {
@@ -187,25 +130,6 @@ export const updateChatTitle = mutation({
         }
         if (chat.userId !== currentUser._id) {
             throw new ConvexError("Forbidden");
-        }
-
-        await ctx.table("chats").getX(chatId).patch({
-            title,
-        });
-
-        return { success: true };
-    },
-});
-
-export const internalUpdateChatTitle = internalMutation({
-    args: {
-        chatId: v.id("chats"),
-        title: v.string(),
-    },
-    handler: async (ctx, { chatId, title }) => {
-        const chat = await ctx.table("chats").get(chatId);
-        if (!chat) {
-            throw new ConvexError("Chat not found");
         }
 
         await ctx.table("chats").getX(chatId).patch({
@@ -261,7 +185,27 @@ export const getChatForUser = internalQuery({
     },
 });
 
-// Internal mutation to update messages (called from backend)
+// Internal mutation to update chat title (called from actions)
+export const internalUpdateChatTitle = internalMutation({
+    args: {
+        chatId: v.id("chats"),
+        title: v.string(),
+    },
+    handler: async (ctx, { chatId, title }) => {
+        const chat = await ctx.table("chats").get(chatId);
+        if (!chat) {
+            throw new ConvexError("Chat not found");
+        }
+
+        await ctx.table("chats").getX(chatId).patch({
+            title,
+        });
+
+        return { success: true };
+    },
+});
+
+// Internal mutation to update messages (called from HTTP actions)
 export const internalUpdateMessages = internalMutation({
     args: {
         chatId: v.id("chats"),
@@ -276,36 +220,6 @@ export const internalUpdateMessages = internalMutation({
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
             throw new ConvexError("Chat not found");
-        }
-
-        await ctx.table("chats").getX(chatId).patch({
-            messages,
-        });
-
-        return { success: true };
-    },
-});
-
-// Update messages in a chat (for streaming updates) - DEPRECATED
-// This will be removed once backend handles all updates
-export const updateMessages = mutation({
-    args: {
-        chatId: v.id("chats"),
-        messages: v.array(
-            v.object({
-                role: v.union(v.literal("user"), v.literal("assistant")),
-                content: v.string(),
-            })
-        ),
-    },
-    handler: async (ctx, { chatId, messages }) => {
-        const currentUser = await getUserOrThrow(ctx);
-        const chat = await ctx.table("chats").get(chatId);
-        if (!chat) {
-            throw new ConvexError("Chat not found");
-        }
-        if (chat.userId !== currentUser._id) {
-            throw new ConvexError("Forbidden");
         }
 
         await ctx.table("chats").getX(chatId).patch({
