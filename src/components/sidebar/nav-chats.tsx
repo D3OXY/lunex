@@ -2,6 +2,19 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useChatService } from "@/lib/services/chat-service";
 import type { Chat } from "@/lib/stores/chat-store";
 import { useChats } from "@/lib/stores/chat-store";
@@ -10,6 +23,7 @@ import { GitBranchIcon, MessageSquareIcon, PenLine, X, XIcon } from "lucide-reac
 import type { HTMLAttributes, ReactElement } from "react";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useSidebar } from "@/components/ui/sidebar";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 type NavChatsProps = HTMLAttributes<HTMLDivElement> & {
@@ -23,13 +37,16 @@ interface ChatGroup {
 }
 
 export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement => {
-    const [editingChatId, setEditingChatId] = useState<Id<"chats"> | null>(null);
-    const [editTitle, setEditTitle] = useState("");
     const [hoveredChatId, setHoveredChatId] = useState<Id<"chats"> | null>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+    const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+    const [newTitle, setNewTitle] = useState("");
 
     const chats = useChats();
     const location = useLocation();
     const { deleteChat, updateChatTitle } = useChatService();
+    const { open: sidebarOpen } = useSidebar();
 
     // Memoized chat groups for better performance
     const chatGroups = useMemo((): ChatGroup[] => {
@@ -82,30 +99,37 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
 
     const handleDeleteChat = async (chatId: Id<"chats">): Promise<void> => {
         await deleteChat({ chatId });
+        setDeleteDialogOpen(false);
+        setSelectedChat(null);
     };
 
     const startEdit = (chatId: Id<"chats">, currentTitle: string): void => {
-        setEditingChatId(chatId);
-        setEditTitle(currentTitle);
+        setSelectedChat(chats.find((chat) => chat._id === chatId) ?? null);
+        setNewTitle(currentTitle);
+        setRenameDialogOpen(true);
     };
 
-    const saveEdit = async (chatId: Id<"chats">): Promise<void> => {
-        const trimmedTitle = editTitle.trim();
+    const saveEdit = async (): Promise<void> => {
+        if (!selectedChat) return;
+
+        const trimmedTitle = newTitle.trim();
         if (!trimmedTitle) return;
 
-        await updateChatTitle({ chatId, title: trimmedTitle });
-        setEditingChatId(null);
-        setEditTitle("");
+        await updateChatTitle({ chatId: selectedChat._id, title: trimmedTitle });
+        setSelectedChat(null);
+        setNewTitle("");
+        setRenameDialogOpen(false);
     };
 
     const cancelEdit = (): void => {
-        setEditingChatId(null);
-        setEditTitle("");
+        setSelectedChat(null);
+        setNewTitle("");
+        setRenameDialogOpen(false);
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent, chatId: Id<"chats">): void => {
+    const handleKeyDown = (e: React.KeyboardEvent): void => {
         if (e.key === "Enter") {
-            void saveEdit(chatId);
+            void saveEdit();
         } else if (e.key === "Escape") {
             cancelEdit();
         }
@@ -114,17 +138,23 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
     const renderChatItem = (chat: Chat, animationIndex: number): ReactElement => {
         const href = `/chat/${chat._id}`;
         const isActive = location.pathname === href;
-        const isEditing = editingChatId === chat._id;
         const isHovered = hoveredChatId === chat._id;
 
-        return (
+        const chatIcon = chat.branched ? (
+            <GitBranchIcon className="text-muted-foreground group-hover:text-foreground h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200" />
+        ) : (
+            <MessageSquareIcon className="text-muted-foreground group-hover:text-foreground h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200" />
+        );
+
+        const chatItem = (
             <div
                 key={chat._id}
                 className={cn(
                     "group relative mx-2 flex cursor-pointer items-center rounded-lg transition-all duration-200 ease-out",
                     "hover:bg-sidebar-accent/70 hover:shadow-sm",
                     "animate-in slide-in-from-left-2 fade-in-0",
-                    isActive && "bg-sidebar-accent border-primary/20 border shadow-sm"
+                    isActive && "bg-sidebar-accent border-primary/20 border shadow-sm",
+                    !sidebarOpen && "justify-center"
                 )}
                 style={{
                     animationDelay: `${animationIndex * 30}ms`,
@@ -133,94 +163,149 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
                 onMouseEnter={() => setHoveredChatId(chat._id)}
                 onMouseLeave={() => setHoveredChatId(null)}
             >
-                {isEditing ? (
-                    <div className="flex w-full items-center gap-2 p-2">
-                        <MessageSquareIcon className="text-muted-foreground h-3.5 w-3.5 flex-shrink-0" />
-                        <Input
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            onBlur={() => void saveEdit(chat._id)}
-                            onKeyDown={(e) => handleKeyDown(e, chat._id)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="focus:ring-primary/50 h-5 flex-1 border-none bg-transparent p-0 text-xs font-medium focus:ring-1"
-                            autoFocus
-                        />
+                <Link to={href} className={cn("flex min-h-0 w-full items-center gap-2 overflow-hidden p-2", !sidebarOpen && "justify-center")}>
+                    {chatIcon}
+                    {sidebarOpen && <div className="group-hover:text-foreground min-w-0 flex-1 truncate text-xs font-medium transition-colors duration-200">{chat.title}</div>}
+                </Link>
+
+                {sidebarOpen && isHovered && (
+                    <div className="from-background via-background/90 animate-in slide-in-from-right-2 fade-in-0 absolute top-0 right-0 bottom-0 z-10 flex items-center justify-end gap-1 bg-gradient-to-l to-transparent pr-2 pl-8 duration-200">
                         <Button
                             variant="ghost"
-                            size="sm"
-                            className="h-5 w-5 flex-shrink-0 p-0 opacity-70 hover:opacity-100"
+                            className="h-6 w-6 p-0 text-white"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                cancelEdit();
+                                startEdit(chat._id, chat.title);
                             }}
+                            title="Rename chat"
                         >
-                            <XIcon className="h-2.5 w-2.5" />
+                            <PenLine className="size-4" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-white"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedChat(chat);
+                                setDeleteDialogOpen(true);
+                            }}
+                            title="Delete chat"
+                        >
+                            <X className="size-4" />
                         </Button>
                     </div>
-                ) : (
-                    <>
-                        <Link to={href} className="flex min-h-0 w-full items-center gap-2 overflow-hidden p-2">
-                            {chat.branched ? (
-                                <GitBranchIcon className="text-muted-foreground group-hover:text-foreground h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200" />
-                            ) : (
-                                <MessageSquareIcon className="text-muted-foreground group-hover:text-foreground h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200" />
-                            )}
-                            <div className="group-hover:text-foreground min-w-0 flex-1 truncate text-xs font-medium transition-colors duration-200">{chat.title}</div>
-                        </Link>
-
-                        {isHovered && (
-                            <div className="from-background via-background/90 animate-in slide-in-from-right-2 fade-in-0 absolute top-0 right-0 bottom-0 z-10 flex items-center justify-end gap-1 bg-gradient-to-l to-transparent pr-2 pl-8 duration-200">
-                                <Button
-                                    variant="ghost"
-                                    className="h-6 w-6 p-0 text-white"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        startEdit(chat._id, chat.title);
-                                    }}
-                                    title="Rename chat"
-                                >
-                                    <PenLine className="size-4" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    className="h-6 w-6 p-0 text-white"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        void handleDeleteChat(chat._id);
-                                    }}
-                                    title="Delete chat"
-                                >
-                                    <X className="size-4" />
-                                </Button>
-                            </div>
-                        )}
-                    </>
                 )}
             </div>
         );
+
+        // When sidebar is collapsed, wrap with tooltip
+        if (!sidebarOpen) {
+            return (
+                <Tooltip key={chat._id}>
+                    <TooltipTrigger asChild>{chatItem}</TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                        <p className="font-medium">{chat.title}</p>
+                        {chat.branched && <p className="text-muted-foreground text-xs">Branch</p>}
+                    </TooltipContent>
+                </Tooltip>
+            );
+        }
+
+        return chatItem;
     };
 
     return (
-        <div className={cn("flex h-full flex-col", className)} {...props}>
-            <div className="flex-1 overflow-x-hidden overflow-y-auto">
-                <div className="pb-4">
-                    {chats.length === 0 ? (
-                        <div className="text-muted-foreground animate-in fade-in-50 flex h-32 flex-col items-center justify-center px-2 duration-300">
-                            <MessageSquareIcon className="mb-2 h-6 w-6" />
-                            <p className="text-center text-xs">No chats yet</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-1">
-                            {chatGroups.map((group) => (
-                                <div key={group.title} className="mb-4">
-                                    <div className="text-muted-foreground mb-2 px-2 text-xs font-medium">{group.title}</div>
-                                    <div className="space-y-1">{group.chats.map((chat, index) => renderChatItem(chat, group.startIndex + index))}</div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+        <TooltipProvider>
+            <div className={cn("flex h-full flex-col", className)} {...props}>
+                <div className="flex-1 overflow-x-hidden overflow-y-auto">
+                    <div className="pb-4">
+                        {chats.length === 0 ? (
+                            <div className="text-muted-foreground animate-in fade-in-50 flex h-32 flex-col items-center justify-center px-2 duration-300">
+                                <MessageSquareIcon className="mb-2 h-6 w-6" />
+                                {sidebarOpen && <p className="text-center text-xs">No chats yet</p>}
+                            </div>
+                        ) : (
+                            <div className="space-y-1">
+                                {chatGroups.map((group) => (
+                                    <div key={group.title} className="mb-4">
+                                        {sidebarOpen && <div className="text-muted-foreground mb-2 px-2 text-xs font-medium">{group.title}</div>}
+                                        <div className="space-y-1">{group.chats.map((chat, index) => renderChatItem(chat, group.startIndex + index))}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
+
+                {selectedChat && (
+                    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+                                <AlertDialogDescription>Are you sure you want to delete &quot;{selectedChat.title}&quot;? This action cannot be undone.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel
+                                    onClick={() => {
+                                        setDeleteDialogOpen(false);
+                                        setSelectedChat(null);
+                                    }}
+                                >
+                                    Cancel
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => void handleDeleteChat(selectedChat._id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                    Delete
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                )}
+
+                {selectedChat && (
+                    <Dialog
+                        open={renameDialogOpen}
+                        onOpenChange={(open) => {
+                            setRenameDialogOpen(open);
+                            if (!open) {
+                                cancelEdit();
+                            }
+                        }}
+                    >
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Rename Chat</DialogTitle>
+                                <DialogDescription>Make changes to your chat title here. Click save when you&apos;re done.</DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="name" className="text-right">
+                                        Name
+                                    </Label>
+                                    <Input
+                                        id="name"
+                                        value={newTitle}
+                                        onChange={(e) => setNewTitle(e.target.value)}
+                                        onKeyDown={(e) => handleKeyDown(e)}
+                                        className="col-span-3"
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={cancelEdit}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" onClick={() => void saveEdit()} disabled={!newTitle.trim()}>
+                                    Save changes
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </div>
-        </div>
+        </TooltipProvider>
     );
 };
