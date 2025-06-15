@@ -23,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUser } from "@clerk/nextjs";
-import { Copy, Edit3, GitBranch, GlobeIcon, RotateCcw } from "lucide-react";
+import { Copy, Edit3, GitBranch, GlobeIcon, RotateCcw, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 interface ChatInterfaceProps {
@@ -37,8 +37,11 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const [selectedMessageIndex, setSelectedMessageIndex] = useState<number | null>(null);
     const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
     const [editedContent, setEditedContent] = useState("");
+    const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+    const [isAtBottom, setIsAtBottom] = useState(true);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
 
     // Store hooks
     const { setCurrentChatId } = useChatStore();
@@ -69,10 +72,44 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         }
     }, [chatId, setCurrentChatId]);
 
-    // Auto-scroll to bottom
+    // Scroll detection
     useEffect(() => {
+        const scrollArea = scrollAreaRef.current;
+        if (!scrollArea) return;
+
+        const handleScroll = () => {
+            const viewport = scrollArea.querySelector("[data-radix-scroll-area-viewport]")!;
+
+            const { scrollTop, scrollHeight, clientHeight } = viewport;
+            const threshold = 100; // Show button when 100px from bottom
+            const atBottom = scrollHeight - scrollTop - clientHeight < threshold;
+
+            setIsAtBottom(atBottom);
+            setShowScrollToBottom(!atBottom && scrollHeight > clientHeight);
+        };
+
+        const viewport = scrollArea.querySelector("[data-radix-scroll-area-viewport]")!;
+        if (viewport) {
+            viewport.addEventListener("scroll", handleScroll);
+            // Initial check
+            handleScroll();
+
+            return () => viewport.removeEventListener("scroll", handleScroll);
+        }
+    }, [currentChat?.messages]);
+
+    // Modified auto-scroll - only scroll when user is at bottom
+    useEffect(() => {
+        if (isAtBottom) {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [currentChat?.messages, isStreaming, isAtBottom]);
+
+    const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [currentChat?.messages, isStreaming]);
+        setShowScrollToBottom(false);
+        setIsAtBottom(true);
+    };
 
     const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
@@ -237,8 +274,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         <TooltipProvider>
             <div className="flex h-full flex-col">
                 {/* Messages */}
-                <div className="flex-1 overflow-hidden">
-                    <ScrollArea className="h-full px-4">
+                <div className="relative flex-1 overflow-hidden">
+                    <ScrollArea className="h-full px-4" ref={scrollAreaRef}>
                         <AIBranch className="h-full">
                             <AIBranchMessages>
                                 <div className="space-y-4 py-4">
@@ -377,6 +414,22 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                             </AIBranchSelector>
                         </AIBranch>
                     </ScrollArea>
+
+                    {/* Scroll to bottom button */}
+                    {showScrollToBottom && (
+                        <div className="absolute right-4 bottom-4 z-10">
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="secondary" size="sm" className="h-10 w-10 rounded-full p-0 shadow-lg" onClick={scrollToBottom}>
+                                        <ChevronDown className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Scroll to bottom</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
+                    )}
                 </div>
 
                 {/* Input & Suggestions - Fixed at bottom */}
