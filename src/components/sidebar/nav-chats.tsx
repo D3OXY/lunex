@@ -17,9 +17,9 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useChatService } from "@/lib/services/chat-service";
 import type { Chat } from "@/lib/stores/chat-store";
-import { useChats } from "@/lib/stores/chat-store";
+import { useChats, useChatStore } from "@/lib/stores/chat-store";
 import { cn } from "@/lib/utils";
-import { GitBranchIcon, MessageSquareIcon, PenLine, X, XIcon } from "lucide-react";
+import { GitBranchIcon, MessageSquareIcon, PenLine, X } from "lucide-react";
 import type { HTMLAttributes, ReactElement } from "react";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -47,6 +47,7 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
     const location = useLocation();
     const { deleteChat, updateChatTitle } = useChatService();
     const { open: sidebarOpen } = useSidebar();
+    const { removeChat } = useChatStore();
 
     // Memoized chat groups for better performance
     const chatGroups = useMemo((): ChatGroup[] => {
@@ -98,9 +99,21 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
     }, [chats]);
 
     const handleDeleteChat = async (chatId: Id<"chats">): Promise<void> => {
-        await deleteChat({ chatId });
+        // Immediately remove from local store for instant UI feedback
+        removeChat(chatId);
+
+        // Close dialog and clear state
         setDeleteDialogOpen(false);
         setSelectedChat(null);
+
+        try {
+            // Call server mutation to persist the deletion
+            await deleteChat({ chatId });
+        } catch (error) {
+            console.error("Failed to delete chat on server:", error);
+            // Note: We don't re-add the chat here because the sync layer will handle
+            // restoring it if the server deletion failed
+        }
     };
 
     const startEdit = (chatId: Id<"chats">, currentTitle: string): void => {

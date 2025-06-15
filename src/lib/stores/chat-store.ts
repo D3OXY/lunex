@@ -142,12 +142,31 @@ export const useChatStore = create<ChatState>()(
                     return serverChat;
                 });
 
-                // Add any local-only chats that aren't on the server yet
+                // Only add local-only chats that are very recent (created in the last 30 seconds)
+                // This prevents keeping deleted chats that haven't been synced yet
                 const serverChatIds = new Set(serverChats.map((chat) => chat._id));
-                const localOnlyChats = state.chats.filter((chat) => !serverChatIds.has(chat._id));
+                const now = Date.now();
+                const localOnlyChats = state.chats.filter((chat) => {
+                    if (serverChatIds.has(chat._id)) return false;
+
+                    // Only keep local chats that are very recent (likely pending sync)
+                    const chatAge = now - chat._creationTime;
+                    return chatAge < 30000; // 30 seconds
+                });
+
+                // Update currentChatId if the current chat was deleted
+                let newCurrentChatId = state.currentChatId;
+                if (state.currentChatId && !serverChatIds.has(state.currentChatId)) {
+                    // Check if it's in localOnlyChats
+                    const isLocalOnly = localOnlyChats.some((chat) => chat._id === state.currentChatId);
+                    if (!isLocalOnly) {
+                        newCurrentChatId = null;
+                    }
+                }
 
                 return {
                     chats: [...localOnlyChats, ...mergedChats],
+                    currentChatId: newCurrentChatId,
                 };
             }),
 
