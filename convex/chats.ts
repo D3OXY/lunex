@@ -310,19 +310,38 @@ export const regenerateResponse = mutation({
             throw new ConvexError("Forbidden");
         }
 
-        // Validate message index
-        if (messageIndex < 0 || messageIndex >= chat.messages.length) {
-            throw new ConvexError("Invalid message index");
-        }
+        // Handle race condition: if messageIndex is out of bounds, find the last assistant message
+        let targetMessageIndex = messageIndex;
 
-        // Ensure we're regenerating an assistant message
-        const targetMessage = chat.messages[messageIndex];
-        if (targetMessage.role !== "assistant") {
-            throw new ConvexError("Can only regenerate assistant messages");
+        if (messageIndex >= chat.messages.length) {
+            // Find the last assistant message in the database
+            let lastAssistantIndex = -1;
+            for (let i = chat.messages.length - 1; i >= 0; i--) {
+                if (chat.messages[i]?.role === "assistant") {
+                    lastAssistantIndex = i;
+                    break;
+                }
+            }
+
+            if (lastAssistantIndex === -1) {
+                throw new ConvexError("No assistant messages found to regenerate");
+            }
+            targetMessageIndex = lastAssistantIndex;
+        } else {
+            // Validate the provided message index
+            if (messageIndex < 0) {
+                throw new ConvexError("Invalid message index");
+            }
+
+            // Ensure we're regenerating an assistant message
+            const targetMessage = chat.messages[messageIndex];
+            if (!targetMessage || targetMessage.role !== "assistant") {
+                throw new ConvexError("Can only regenerate assistant messages");
+            }
         }
 
         // Truncate messages up to (but not including) the assistant message to be regenerated
-        const truncatedMessages = chat.messages.slice(0, messageIndex);
+        const truncatedMessages = chat.messages.slice(0, targetMessageIndex);
 
         await ctx.table("chats").getX(chatId).patch({
             messages: truncatedMessages,

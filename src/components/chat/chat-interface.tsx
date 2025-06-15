@@ -215,6 +215,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
     const allMessages = currentChat?.messages ?? [];
 
+    // Find the last assistant message index for regenerate functionality
+    const lastAssistantMessageIndex = (() => {
+        for (let i = allMessages.length - 1; i >= 0; i--) {
+            if (allMessages[i]?.role === "assistant") {
+                return i;
+            }
+        }
+        return -1;
+    })();
+
     if (isLoading || !currentUser) {
         return (
             <div className="flex h-full items-center justify-center">
@@ -311,7 +321,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                                                         </TooltipContent>
                                                                     </Tooltip>
                                                                     {/* Show regenerate button only for the last AI response */}
-                                                                    {index === allMessages.length - 1 && (
+                                                                    {index === lastAssistantMessageIndex && (
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
                                                                                 <Button
