@@ -104,7 +104,7 @@ export const generateAndUpdateTitle = action({
 
             if (generatedTitle && generatedTitle !== "New Chat") {
                 // Update the chat title
-                await ctx.runMutation(internal.chats.updateChatTitle, {
+                await ctx.runMutation(internal.chats.internalUpdateChatTitle, {
                     chatId,
                     title: generatedTitle,
                 });
@@ -148,7 +148,30 @@ export const addMessage = mutation({
 });
 
 // Update chat title
-export const updateChatTitle = internalMutation({
+export const updateChatTitle = mutation({
+    args: {
+        chatId: v.id("chats"),
+        title: v.string(),
+    },
+    handler: async (ctx, { chatId, title }) => {
+        const currentUser = await getUserOrThrow(ctx);
+        const chat = await ctx.table("chats").get(chatId);
+        if (!chat) {
+            throw new ConvexError("Chat not found");
+        }
+        if (chat.userId !== currentUser._id) {
+            throw new ConvexError("Forbidden");
+        }
+
+        await ctx.table("chats").getX(chatId).patch({
+            title,
+        });
+
+        return { success: true };
+    },
+});
+
+export const internalUpdateChatTitle = internalMutation({
     args: {
         chatId: v.id("chats"),
         title: v.string(),
