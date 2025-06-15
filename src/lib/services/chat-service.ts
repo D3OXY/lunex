@@ -30,6 +30,7 @@ const streamChatResponse = async (
     chatId: Id<"chats">,
     modelId: string,
     authToken: string,
+    webSearchEnabled: boolean,
     onStream?: (content: string) => void,
     onReasoning?: (content: string) => void,
     onComplete?: (fullResponse: string) => void,
@@ -38,7 +39,7 @@ const streamChatResponse = async (
     const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, chatId, modelId, authToken }),
+        body: JSON.stringify({ messages, chatId, modelId, authToken, webSearchEnabled }),
     });
 
     if (!response.ok) {
@@ -110,6 +111,7 @@ export function useChatService() {
         setCurrentChatId,
         startStreaming,
         stopStreaming,
+        webSearchEnabled,
     } = useChatStore();
 
     const sendMessage = async (
@@ -182,6 +184,7 @@ export function useChatService() {
                     currentChatId,
                     modelId,
                     authToken,
+                    webSearchEnabled,
                     (chunk: string) => {
                         fullResponse += chunk;
                         const now = Date.now();

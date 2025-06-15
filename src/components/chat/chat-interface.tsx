@@ -1,7 +1,7 @@
 "use client";
 
 import { useChatService } from "@/lib/services/chat-service";
-import { useChatStore, useCurrentChat, useIsStreaming } from "@/lib/stores/chat-store";
+import { useChatStore, useCurrentChat, useIsStreaming, useWebSearchEnabled } from "@/lib/stores/chat-store";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -17,6 +17,7 @@ import { ReasoningDisplay } from "@/components/reasoning-display";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUser } from "@clerk/nextjs";
+import { GlobeIcon } from "lucide-react";
 
 interface ChatInterfaceProps {
     chatId?: Id<"chats">;
@@ -32,6 +33,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const { setCurrentChatId } = useChatStore();
     const currentChat = useCurrentChat();
     const isStreaming = useIsStreaming();
+    const webSearchEnabled = useWebSearchEnabled();
 
     // Service hooks
     const { sendMessage } = useChatService();
@@ -144,6 +146,14 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
             {/* Input & Suggestions - Fixed at bottom */}
             <div className="bg-background flex-shrink-0">
+                {webSearchEnabled && (
+                    <div className="border-t px-4 py-2">
+                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                            <GlobeIcon size={14} />
+                            <span>Web search enabled - responses will include real-time information</span>
+                        </div>
+                    </div>
+                )}
                 <div className="">
                     <ChatInput chatId={chatId ?? null} disabled={isSubmitting || isStreaming} onSubmit={handleSubmit} />
                 </div>

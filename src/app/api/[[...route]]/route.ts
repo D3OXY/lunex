@@ -64,8 +64,14 @@ const updateChatInBackend = async (chatId: string, messages: Array<{ role: "user
 
 // Chat streaming endpoint with OpenRouter
 app.post("/chat/stream", async (c) => {
-    const body: { messages?: Array<{ role: string; content: string }>; chatId?: string; modelId?: string; authToken?: string } = await c.req.json();
-    const { messages, chatId, modelId, authToken } = body;
+    const body: {
+        messages?: Array<{ role: string; content: string }>;
+        chatId?: string;
+        modelId?: string;
+        authToken?: string;
+        webSearchEnabled?: boolean;
+    } = await c.req.json();
+    const { messages, chatId, modelId, authToken, webSearchEnabled } = body;
 
     return stream(c, async (stream) => {
         try {
@@ -117,8 +123,11 @@ app.post("/chat/stream", async (c) => {
             const modelConfig = MODELS[modelId as keyof typeof MODELS];
             const supportsReasoning = Boolean((modelConfig?.features as ModelFeatures)?.reasoning);
 
+            // Append :online to model ID if web search is enabled
+            const effectiveModelId = webSearchEnabled ? `${modelId}:online` : modelId;
+
             const result = await streamText({
-                model: openrouter(modelId, supportsReasoning ? { includeReasoning: true } : {}),
+                model: openrouter(effectiveModelId, supportsReasoning ? { includeReasoning: true } : {}),
                 messages: coreMessages,
             });
 

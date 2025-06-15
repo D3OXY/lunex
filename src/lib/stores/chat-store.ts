@@ -29,6 +29,7 @@ interface ChatState {
     isLoading: boolean;
     isStreaming: boolean;
     streamingMessage: string;
+    webSearchEnabled: boolean;
 
     // Stream priority tracking
     activeStreamChatId: Id<"chats"> | null;
@@ -43,6 +44,7 @@ interface ChatState {
     addChat: (chat: Chat) => void;
     updateChat: (chatId: Id<"chats">, updates: Partial<Chat>) => void;
     removeChat: (chatId: Id<"chats">) => void;
+    setWebSearchEnabled: (enabled: boolean) => void;
 
     // Message actions
     addMessage: (chatId: Id<"chats">, message: Message) => void;
@@ -71,6 +73,7 @@ export const useChatStore = create<ChatState>()(
         isLoading: false,
         isStreaming: false,
         streamingMessage: "",
+        webSearchEnabled: false,
         activeStreamChatId: null,
         streamingMessageIndex: null,
 
@@ -148,6 +151,8 @@ export const useChatStore = create<ChatState>()(
                 currentChatId: state.currentChatId === chatId ? null : state.currentChatId,
             })),
 
+        setWebSearchEnabled: (enabled) => set({ webSearchEnabled: enabled }),
+
         // Message actions
         addMessage: (chatId, message) =>
             set((state) => ({
@@ -217,3 +222,4 @@ export const useCurrentChat = () => useChatStore((state) => state.getCurrentChat
 export const useChats = () => useChatStore((state) => state.chats);
 export const useIsStreaming = () => useChatStore((state) => state.isStreaming);
 export const useStreamingMessage = () => useChatStore((state) => state.streamingMessage);
+export const useWebSearchEnabled = () => useChatStore((state) => state.webSearchEnabled);

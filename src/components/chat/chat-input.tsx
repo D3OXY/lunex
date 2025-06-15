@@ -20,7 +20,7 @@ import { getModelsByProvider, type ModelDefinition, type ModelFeatures } from "@
 
 export const ChatInput = ({ chatId, disabled, onSubmit }: { chatId: Id<"chats"> | null; disabled: boolean; onSubmit: (e: React.FormEvent) => void }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const { query, setQuery, selectedModel, setSelectedModel } = useChatStore();
+    const { query, setQuery, selectedModel, setSelectedModel, webSearchEnabled, setWebSearchEnabled } = useChatStore();
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -82,7 +82,11 @@ export const ChatInput = ({ chatId, disabled, onSubmit }: { chatId: Id<"chats"> 
                     <AIInputButton>
                         <MicIcon size={16} />
                     </AIInputButton>
-                    <AIInputButton>
+                    <AIInputButton
+                        onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                        className={webSearchEnabled ? "bg-primary/10 text-primary" : ""}
+                        title={webSearchEnabled ? "Disable web search" : "Enable web search"}
+                    >
                         <GlobeIcon size={16} />
                         <span>Search</span>
                     </AIInputButton>
