@@ -159,6 +159,14 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                 messageIndex: editingMessageIndex,
             });
 
+            // Update UI state immediately to remove the old messages after the edited one
+            // This will trigger a re-render and remove the old messages from the UI
+            if (currentChat) {
+                const truncatedMessages = currentChat.messages.slice(0, editingMessageIndex);
+                // Update the chat in the store to reflect the truncation
+                useChatStore.getState().updateChat(chatId, { messages: truncatedMessages });
+            }
+
             // Send the new message content to get AI response
             await sendMessage(contentToSend, selectedModel, chatId, currentUser._id);
         } catch (error) {
