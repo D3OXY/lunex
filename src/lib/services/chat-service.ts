@@ -256,7 +256,7 @@ export function useChatService() {
 
         // Add assistant placeholder and start streaming tracking
         addMessageToStore(currentChatId, { role: "assistant", content: "", isStreaming: true });
-        const assistantIndex = getCurrentChat()?.messages.length ?? 1;
+        const assistantIndex = (getCurrentChat()?.messages.length ?? 1) - 1;
 
         // Start stream priority tracking
         startStreaming(currentChatId, assistantIndex);
