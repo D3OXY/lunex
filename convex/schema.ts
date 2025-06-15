@@ -15,12 +15,20 @@ const schema = defineEntSchema({
     chats: defineEnt({
         userId: v.id("users"),
         title: v.string(),
+        visibility: v.union(v.literal("public"), v.literal("private")),
+        branched: v.boolean(),
         messages: v.array(
             v.object({
                 role: v.union(v.literal("user"), v.literal("assistant")),
                 content: v.string(),
             })
         ),
+    }),
+    userPreferences: defineEnt({
+        userId: v.id("users"),
+        defaultModel: v.string(),
+        openRouterApiKey: v.optional(v.string()),
+        userModels: v.array(v.string()),
     }),
 });
 
