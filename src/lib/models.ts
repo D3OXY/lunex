@@ -124,6 +124,7 @@ export type ModelFeatures = {
     selfModerated?: boolean;
     coding?: boolean;
     free?: boolean;
+    userModel?: boolean;
 };
 
 export type ModelDefinition = {
