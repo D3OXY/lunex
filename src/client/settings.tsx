@@ -233,16 +233,6 @@ export default function Settings(): React.JSX.Element {
                                                         </div>
                                                     )}
                                                 </div>
-
-                                                <Alert>
-                                                    <AlertCircle className="h-4 w-4" />
-                                                    <AlertDescription>
-                                                        Add model IDs from OpenRouter or other providers. Examples:
-                                                        <code className="bg-muted mx-1 rounded px-1 py-0.5 text-xs">anthropic/claude-3.5-sonnet</code>,
-                                                        <code className="bg-muted mx-1 rounded px-1 py-0.5 text-xs">openai/gpt-4o</code>,
-                                                        <code className="bg-muted mx-1 rounded px-1 py-0.5 text-xs">google/gemini-2.0-flash-001</code>
-                                                    </AlertDescription>
-                                                </Alert>
                                             </CardContent>
                                         </Card>
                                     </TabsContent>
@@ -257,7 +247,7 @@ export default function Settings(): React.JSX.Element {
                                             <CardContent className="space-y-4">
                                                 <Alert>
                                                     <AlertCircle className="h-4 w-4" />
-                                                    <AlertDescription>
+                                                    <AlertDescription className="flex flex-col gap-2">
                                                         Your API key is stored securely and only used for your requests. You can get an API key from{" "}
                                                         <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">
                                                             OpenRouter

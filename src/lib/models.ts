@@ -97,23 +97,19 @@ export const MODELS = {
         name: "Claude 3 Haiku (Self Moderated)",
         provider: "Anthropic",
         features: {
-            free: true,
             selfModerated: true,
         },
     },
     "anthropic/claude-3-haiku": {
         name: "Claude 3 Haiku",
         provider: "Anthropic",
-        features: {
-            free: true,
-        },
+        features: {},
     },
     "openai/gpt-4.1-nano": {
         name: "GPT-4.1 Nano",
         provider: "OpenAI",
         features: {
             coding: true,
-            free: true,
         },
     },
 } as const;
