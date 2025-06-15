@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -29,6 +30,10 @@ interface ChatState {
     isStreaming: boolean;
     streamingMessage: string;
 
+    // Stream priority tracking
+    activeStreamChatId: Id<"chats"> | null;
+    streamingMessageIndex: number | null;
+
     // Actions
     setQuery: (query: string) => void;
     setSelectedModel: (model: string) => void;
@@ -47,6 +52,10 @@ interface ChatState {
     setStreamingMessage: (message: string) => void;
     clearStreamingMessage: () => void;
 
+    // Stream priority actions
+    startStreaming: (chatId: Id<"chats">, messageIndex: number) => void;
+    stopStreaming: () => void;
+
     // Utilities
     getCurrentChat: () => Chat | null;
     getChatById: (chatId: Id<"chats">) => Chat | null;
@@ -62,6 +71,8 @@ export const useChatStore = create<ChatState>()(
         isLoading: false,
         isStreaming: false,
         streamingMessage: "",
+        activeStreamChatId: null,
+        streamingMessageIndex: null,
 
         // Actions
         setQuery: (query) => set({ query }),
@@ -79,11 +90,32 @@ export const useChatStore = create<ChatState>()(
                 const mergedChats = serverChats.map((serverChat) => {
                     const localChat = localChatsMap.get(serverChat._id);
                     if (localChat) {
-                        // If we have local changes (like streaming messages), preserve them
-                        // but update server-side properties like title
+                        // If this specific chat is currently streaming, prioritize local state
+                        if (state.activeStreamChatId === serverChat._id && state.isStreaming) {
+                            return {
+                                ...serverChat,
+                                messages: localChat.messages, // Keep local streaming messages
+                            };
+                        }
+
+                        // If not streaming or different chat, prefer server data if it has more content
+                        // This handles the case where server has been updated during refresh
+                        const serverHasMoreMessages = serverChat.messages.length > localChat.messages.length;
+                        const serverLastMessage = serverChat.messages[serverChat.messages.length - 1];
+                        const localLastMessage = localChat.messages[localChat.messages.length - 1];
+
+                        // Check if server has more recent or complete content
+                        const serverHasMoreContent =
+                            serverLastMessage &&
+                            localLastMessage &&
+                            serverLastMessage.role === localLastMessage.role &&
+                            serverLastMessage.content.length > localLastMessage.content.length;
+
+                        const shouldUseServerMessages = Boolean(serverHasMoreMessages || serverHasMoreContent || !state.isStreaming);
+
                         return {
                             ...serverChat,
-                            messages: localChat.messages.length > serverChat.messages.length ? localChat.messages : serverChat.messages,
+                            messages: shouldUseServerMessages ? serverChat.messages : localChat.messages,
                         };
                     }
                     return serverChat;
@@ -151,6 +183,21 @@ export const useChatStore = create<ChatState>()(
         setStreamingMessage: (message) => set({ streamingMessage: message }),
 
         clearStreamingMessage: () => set({ streamingMessage: "" }),
+
+        // Stream priority actions
+        startStreaming: (chatId, messageIndex) =>
+            set({
+                activeStreamChatId: chatId,
+                streamingMessageIndex: messageIndex,
+                isStreaming: true,
+            }),
+
+        stopStreaming: () =>
+            set({
+                activeStreamChatId: null,
+                streamingMessageIndex: null,
+                isStreaming: false,
+            }),
 
         // Utilities
         getCurrentChat: () => {

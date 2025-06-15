@@ -34,11 +34,13 @@ export function SyncProvider({ children }: SyncProviderProps): React.JSX.Element
     const { mergeChatsFromServer } = useChatStore();
 
     // Sync chats with server when userChats changes
+    // The mergeChatsFromServer function already handles stream priority
     useEffect(() => {
         if (userChats && Array.isArray(userChats)) {
             mergeChatsFromServer(userChats);
         }
-    }, [userChats, mergeChatsFromServer]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userChats]);
 
     const contextValue: SyncContextValue = {
         currentUser,

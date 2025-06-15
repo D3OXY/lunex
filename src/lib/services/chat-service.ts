@@ -101,7 +101,16 @@ export function useChatService() {
     const deleteChat = useMutation(api.chats.deleteChat);
     const { getToken } = useAuth();
 
-    const { setIsStreaming, addMessage: addMessageToStore, updateMessage, updateMessageReasoning, addChat: addChatToStore, getCurrentChat, setCurrentChatId } = useChatStore();
+    const {
+        addMessage: addMessageToStore,
+        updateMessage,
+        updateMessageReasoning,
+        addChat: addChatToStore,
+        getCurrentChat,
+        setCurrentChatId,
+        startStreaming,
+        stopStreaming,
+    } = useChatStore();
 
     const sendMessage = async (
         content: string,
@@ -153,13 +162,14 @@ export function useChatService() {
         const isNewChat = !chatId;
         const baseMessages: Message[] = isNewChat ? [{ role: "user", content }] : (getCurrentChat()?.messages ?? [{ role: "user", content }]);
 
-        // Add assistant placeholder
+        // Add assistant placeholder and start streaming tracking
         addMessageToStore(currentChatId, { role: "assistant", content: "", isStreaming: true });
-
         const assistantIndex = baseMessages.length;
-        const messages: Message[] = [...baseMessages];
 
-        setIsStreaming(true);
+        // Start stream priority tracking
+        startStreaming(currentChatId, assistantIndex);
+
+        const messages: Message[] = [...baseMessages];
 
         let fullResponse = "";
         let lastUpdate = Date.now();
@@ -184,7 +194,8 @@ export function useChatService() {
                         updateMessageReasoning(currentChatId, assistantIndex, reasoning);
                     },
                     (response) => {
-                        setIsStreaming(false);
+                        // Stop streaming tracking first
+                        stopStreaming();
                         updateMessage(currentChatId, assistantIndex, response);
                         // Database update is now handled by the backend
                         // No need to call updateMessages from frontend
@@ -197,14 +208,14 @@ export function useChatService() {
                             console.info(`Retrying stream in ${backoffMs}ms (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS})...`);
                             setTimeout(() => void executeStream(), backoffMs);
                         } else {
-                            setIsStreaming(false);
+                            stopStreaming();
                             updateMessage(currentChatId, assistantIndex, `Error after ${MAX_RETRY_ATTEMPTS} attempts: ${error}`);
                         }
                     }
                 );
             } catch (err: unknown) {
                 console.error("executeStream error", err instanceof Error ? err.message : err);
-                setIsStreaming(false);
+                stopStreaming();
                 updateMessage(currentChatId, assistantIndex, "An error occurred while streaming the response");
             }
         };
@@ -213,7 +224,7 @@ export function useChatService() {
             await executeStream();
             return currentChatId;
         } catch (error: unknown) {
-            setIsStreaming(false);
+            stopStreaming();
             const message = error instanceof Error ? error.message : "Unknown error";
             console.error("Send message error:", message);
             throw new Error(message);
