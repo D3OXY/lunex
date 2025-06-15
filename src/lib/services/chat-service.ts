@@ -227,31 +227,34 @@ export function useChatService() {
 
         addMessageToStore(currentChatId, { role: "user", content: displayContent });
 
-        // For new chats, we know the messages are just the user message we added
-        // For existing chats, get the current messages and convert to API format
+        // Prepare messages for API - include conversation context
         const isNewChat = !chatId;
-        let baseMessages: Message[];
+        let apiMessages: Message[];
 
         if (isNewChat) {
-            baseMessages = [{ role: "user", content: userMessageContent }];
+            // For new chats, only send the current message
+            apiMessages = [{ role: "user", content: userMessageContent }];
         } else {
+            // For existing chats, include conversation context
             const currentChat = getCurrentChat();
             const chatMessages = currentChat?.messages ?? [];
 
-            // Convert existing messages to API format (keeping last few for context)
-            const recentMessages = chatMessages.slice(-10); // Keep last 10 messages for context
-            baseMessages = recentMessages.map((msg) => ({
+            // Get conversation history (excluding the message we just added)
+            const historyMessages = chatMessages.slice(0, -1);
+
+            // Convert to API format, but be careful with attachments
+            const contextMessages: Message[] = historyMessages.map((msg) => ({
                 role: msg.role,
-                content: msg.content,
+                content: msg.content, // Use the stored content as-is for context
             }));
 
-            // Add the new user message
-            baseMessages.push({ role: "user", content: userMessageContent });
+            // Add the new user message with proper format
+            apiMessages = [...contextMessages, { role: "user", content: userMessageContent }];
         }
 
         // Add assistant placeholder and start streaming tracking
         addMessageToStore(currentChatId, { role: "assistant", content: "", isStreaming: true });
-        const assistantIndex = isNewChat ? 1 : (getCurrentChat()?.messages.length ?? 1);
+        const assistantIndex = getCurrentChat()?.messages.length ?? 1;
 
         // Start stream priority tracking
         startStreaming(currentChatId, assistantIndex);
@@ -266,7 +269,7 @@ export function useChatService() {
         const executeStream = async (): Promise<void> => {
             try {
                 await streamChatResponse(
-                    baseMessages,
+                    apiMessages,
                     currentChatId,
                     modelId,
                     authToken,

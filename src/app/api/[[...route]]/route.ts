@@ -118,16 +118,12 @@ app.post("/chat/stream", async (c) => {
 
             // Helper function to fetch file from URL and convert to buffer
             const fetchFileAsBuffer = async (url: string): Promise<Buffer> => {
-                console.log("Fetching file from URL:", url);
                 const response = await fetch(url);
                 if (!response.ok) {
-                    console.error(`Failed to fetch file from ${url}: ${response.status} ${response.statusText}`);
                     throw new Error(`Failed to fetch file from ${url}: ${response.statusText}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
-                const buffer = Buffer.from(arrayBuffer);
-                console.log(`Successfully fetched file: ${buffer.length} bytes`);
-                return buffer;
+                return Buffer.from(arrayBuffer);
             };
 
             // Convert messages to CoreMessage format, handling multi-modal content
@@ -153,14 +149,12 @@ app.post("/chat/stream", async (c) => {
                         } else if (part.type === "file" && part.mimeType === "application/pdf") {
                             // For PDFs, fetch the file and convert to buffer
                             try {
-                                console.log("Processing PDF file:", part.data);
                                 const fileBuffer = await fetchFileAsBuffer(part.data ?? "");
                                 content.push({
                                     type: "file" as const,
                                     data: fileBuffer,
                                     mimeType: "application/pdf",
                                 });
-                                console.log("Successfully added PDF to content");
                             } catch (error) {
                                 console.error("Error fetching PDF file:", error);
                                 // Fallback to text description if file fetch fails
@@ -181,8 +175,6 @@ app.post("/chat/stream", async (c) => {
                     });
                 }
             }
-
-            console.log("Final coreMessages:", JSON.stringify(coreMessages, null, 2));
 
             // check if modelId is a valid model id
             if (!modelId || !Object.keys(MODELS).includes(modelId)) {
@@ -220,9 +212,9 @@ app.post("/chat/stream", async (c) => {
                                   if (part.type === "text") {
                                       return part.text ?? "";
                                   } else if (part.type === "image_url") {
-                                      return `[Image]`;
+                                      return "[Image]";
                                   } else if (part.type === "file") {
-                                      return `[${part.mimeType === "application/pdf" ? "PDF" : "File"}]`;
+                                      return "[PDF]";
                                   }
                                   return "";
                               })
