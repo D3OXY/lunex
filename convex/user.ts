@@ -41,8 +41,33 @@ export const upsertFromClerk = internalMutation({
             const userId = await ctx.table("users").insert(userAttributes);
             // Wait for the user to be fully created
             await ctx.table("users").getX(userId);
+
+            // Create default user preferences for new users
+            await ctx.table("userPreferences").insert({
+                userId,
+                defaultModel: "google/gemini-2.0-flash-001",
+                userModels: [],
+            });
+
+            return userId;
         } else {
             await ctx.table("users").getX(user._id).patch(userAttributes);
+
+            // Ensure user preferences exist for existing users
+            const existingPrefs = await ctx
+                .table("userPreferences")
+                .filter((q) => q.eq(q.field("userId"), user._id))
+                .first();
+
+            if (!existingPrefs) {
+                await ctx.table("userPreferences").insert({
+                    userId: user._id,
+                    defaultModel: "google/gemini-2.0-flash-001",
+                    userModels: [],
+                });
+            }
+
+            return user._id;
         }
     },
 });

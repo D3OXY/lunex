@@ -48,6 +48,8 @@ export const createChat = mutation({
             userId: currentUser._id,
             title,
             messages: [],
+            visibility: "private",
+            branched: false,
         });
 
         // If userMessage is provided, schedule background title generation
@@ -227,5 +229,185 @@ export const internalUpdateMessages = internalMutation({
         });
 
         return { success: true };
+    },
+});
+
+// Update chat visibility
+export const updateChatVisibility = mutation({
+    args: {
+        chatId: v.id("chats"),
+        visibility: v.union(v.literal("public"), v.literal("private")),
+    },
+    handler: async (ctx, { chatId, visibility }) => {
+        const currentUser = await getUserOrThrow(ctx);
+        const chat = await ctx.table("chats").get(chatId);
+        if (!chat) {
+            throw new ConvexError("Chat not found");
+        }
+        if (chat.userId !== currentUser._id) {
+            throw new ConvexError("Forbidden");
+        }
+
+        await ctx.table("chats").getX(chatId).patch({
+            visibility,
+        });
+
+        return { success: true };
+    },
+});
+
+// Branch a chat from a specific assistant message
+export const branchChat = mutation({
+    args: {
+        chatId: v.id("chats"),
+        messageIndex: v.number(), // Index of the assistant message to branch from
+        title: v.optional(v.string()),
+    },
+    handler: async (ctx, { chatId, messageIndex, title }) => {
+        const currentUser = await getUserOrThrow(ctx);
+        const originalChat = await ctx.table("chats").get(chatId);
+        if (!originalChat) {
+            throw new ConvexError("Chat not found");
+        }
+        if (originalChat.userId !== currentUser._id) {
+            throw new ConvexError("Forbidden");
+        }
+
+        // Validate message index
+        if (messageIndex < 0 || messageIndex >= originalChat.messages.length) {
+            throw new ConvexError("Invalid message index");
+        }
+
+        // Ensure we're branching from an assistant message
+        const targetMessage = originalChat.messages[messageIndex];
+        if (targetMessage.role !== "assistant") {
+            throw new ConvexError("Can only branch from assistant messages");
+        }
+
+        // Include messages up to and including the target assistant message
+        const branchMessages = originalChat.messages.slice(0, messageIndex + 1);
+
+        // Create a new chat as a branch
+        const branchedChatId = await ctx.table("chats").insert({
+            userId: currentUser._id,
+            title: title ?? `${originalChat.title} (Branch)`,
+            messages: branchMessages,
+            visibility: "private", // Branches are always private by default
+            branched: true,
+        });
+
+        return branchedChatId;
+    },
+});
+
+// Get public chats (for discovery)
+export const getPublicChats = query({
+    args: {
+        limit: v.optional(v.number()),
+    },
+    handler: async (ctx, { limit = 20 }) => {
+        const publicChats = await ctx
+            .table("chats")
+            .filter((q) => q.eq(q.field("visibility"), "public"))
+            .order("desc")
+            .take(limit);
+
+        // Include user information for public chats
+        const chatsWithUsers = await Promise.all(
+            publicChats.map(async (chat) => {
+                const user = await ctx.table("users").get(chat.userId);
+                return {
+                    ...chat,
+                    user: user
+                        ? {
+                              name: user.name,
+                              username: user.username,
+                              imageUrl: user.imageUrl,
+                          }
+                        : null,
+                };
+            })
+        );
+
+        return chatsWithUsers;
+    },
+});
+
+// Get available branch points (assistant messages) in a chat
+export const getChatBranchPoints = query({
+    args: { chatId: v.id("chats") },
+    handler: async (ctx, { chatId }) => {
+        const currentUser = await getUserOrThrow(ctx);
+        const chat = await ctx.table("chats").get(chatId);
+        if (!chat) {
+            throw new ConvexError("Chat not found");
+        }
+        if (chat.userId !== currentUser._id) {
+            throw new ConvexError("Forbidden");
+        }
+
+        // Find all assistant messages that can be used as branch points
+        const branchPoints = chat.messages
+            .map((message, index) => ({
+                index,
+                message,
+            }))
+            .filter(({ message }) => message.role === "assistant")
+            .map(({ index, message }) => ({
+                messageIndex: index,
+                content: message.content.slice(0, 100) + (message.content.length > 100 ? "..." : ""), // Preview
+                timestamp: index, // Use index as a simple timestamp
+            }));
+
+        return branchPoints;
+    },
+});
+
+// Get all branches created from a specific chat
+export const getChatBranches = query({
+    args: { originalChatId: v.id("chats") },
+    handler: async (ctx, { originalChatId }) => {
+        const currentUser = await getUserOrThrow(ctx);
+
+        // Verify user has access to the original chat
+        const originalChat = await ctx.table("chats").get(originalChatId);
+        if (!originalChat) {
+            throw new ConvexError("Original chat not found");
+        }
+        if (originalChat.userId !== currentUser._id) {
+            throw new ConvexError("Forbidden");
+        }
+
+        // Find all branched chats by this user that contain messages from the original chat
+        // This is a simple approach - in a more complex system, you might want to store
+        // explicit parent-child relationships
+        const allUserChats = await ctx
+            .table("chats")
+            .filter((q) => q.eq(q.field("userId"), currentUser._id))
+            .filter((q) => q.eq(q.field("branched"), true))
+            .collect();
+
+        // Filter branches that likely came from this chat by comparing message content
+        const branches = allUserChats.filter((chat) => {
+            if (chat.messages.length === 0 || originalChat.messages.length === 0) {
+                return false;
+            }
+
+            // Check if the first few messages match (indicating this is a branch)
+            const minLength = Math.min(chat.messages.length, originalChat.messages.length, 3);
+            for (let i = 0; i < minLength; i++) {
+                if (chat.messages[i].content !== originalChat.messages[i].content || chat.messages[i].role !== originalChat.messages[i].role) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        return branches.map((branch) => ({
+            _id: branch._id,
+            title: branch.title,
+            messageCount: branch.messages.length,
+            _creationTime: branch._creationTime,
+        }));
     },
 });
