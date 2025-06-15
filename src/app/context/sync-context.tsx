@@ -1,7 +1,6 @@
 "use client";
 
 import { useChatStore } from "@/lib/stores/chat-store";
-import { useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
@@ -27,9 +26,6 @@ interface SyncProviderProps {
 }
 
 export function SyncProvider({ children }: SyncProviderProps): React.JSX.Element {
-    // Clerk user hook
-    const { user: clerkUser } = useUser();
-
     // Convex queries
     const currentUser = useQuery(api.user.current, {});
     const userChats = useQuery(api.chats.getUserChats);
