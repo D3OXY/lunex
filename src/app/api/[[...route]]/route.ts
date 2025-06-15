@@ -303,56 +303,63 @@ app.post("/chat/stream", async (c) => {
             const baseMessages = [...historyMessages, ...newUserMessages];
 
             // Stream the response using AI SDK's built-in reasoning support
-            for await (const part of result.fullStream) {
-                switch (part.type) {
-                    case "text-delta":
-                        fullResponse += part.textDelta;
-                        await stream.write(
-                            JSON.stringify({
-                                type: "delta",
-                                content: part.textDelta,
-                            }) + "\n"
-                        );
-
-                        // Check if we should update the backend incrementally
-                        const now = Date.now();
-                        const shouldUpdateByLength = fullResponse.length - lastUpdateLength >= CHUNK_UPDATE_THRESHOLD;
-                        const shouldUpdateByTime = now - lastUpdateTime >= UPDATE_INTERVAL_MS;
-
-                        if ((shouldUpdateByLength || shouldUpdateByTime) && !isUpdating && fullResponse.trim()) {
-                            isUpdating = true;
-                            lastUpdateLength = fullResponse.length;
-                            lastUpdateTime = now;
-
-                            // Update backend asynchronously without blocking the stream
-                            const updatedMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
-
-                            // Fire and forget - don't await to avoid blocking the stream
-                            void updateChatInBackend(chatId, updatedMessages, authToken).finally(() => {
-                                isUpdating = false;
-                            });
-                        }
-                        break;
-                    case "reasoning":
-                        if (supportsReasoning) {
+            try {
+                for await (const part of result.fullStream) {
+                    switch (part.type) {
+                        case "text-delta":
+                            fullResponse += part.textDelta;
                             await stream.write(
                                 JSON.stringify({
-                                    type: "reasoning",
+                                    type: "delta",
                                     content: part.textDelta,
                                 }) + "\n"
                             );
-                        }
-                        break;
-                    case "finish":
-                        // Final update to ensure we have the complete response
-                        if (fullResponse.trim()) {
-                            const finalMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
 
-                            // Final update - this one we can await since streaming is done
-                            await updateChatInBackend(chatId, finalMessages, authToken);
-                        }
-                        break;
+                            // Check if we should update the backend incrementally
+                            const now = Date.now();
+                            const shouldUpdateByLength = fullResponse.length - lastUpdateLength >= CHUNK_UPDATE_THRESHOLD;
+                            const shouldUpdateByTime = now - lastUpdateTime >= UPDATE_INTERVAL_MS;
+
+                            if ((shouldUpdateByLength || shouldUpdateByTime) && !isUpdating && fullResponse.trim()) {
+                                isUpdating = true;
+                                lastUpdateLength = fullResponse.length;
+                                lastUpdateTime = now;
+
+                                // Update backend asynchronously without blocking the stream
+                                const updatedMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
+
+                                // Fire and forget - don't await to avoid blocking the stream
+                                void updateChatInBackend(chatId, updatedMessages, authToken).finally(() => {
+                                    isUpdating = false;
+                                });
+                            }
+                            break;
+                        case "reasoning":
+                            if (supportsReasoning) {
+                                await stream.write(
+                                    JSON.stringify({
+                                        type: "reasoning",
+                                        content: part.textDelta,
+                                    }) + "\n"
+                                );
+                            }
+                            break;
+                        case "error":
+                            const errorPart = part as { error?: string };
+                            throw new Error(`OpenRouter error: ${errorPart.error ?? "Unknown streaming error"}`);
+                        case "finish":
+                            // Final update to ensure we have the complete response
+                            if (fullResponse.trim()) {
+                                const finalMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
+
+                                // Final update - this one we can await since streaming is done
+                                await updateChatInBackend(chatId, finalMessages, authToken);
+                            }
+                            break;
+                    }
                 }
+            } catch (streamError) {
+                throw streamError; // Re-throw to be caught by outer catch
             }
 
             // Send completion
@@ -363,12 +370,54 @@ app.post("/chat/stream", async (c) => {
                 }) + "\n"
             );
         } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
             await stream.write(
                 JSON.stringify({
                     type: "error",
-                    error: error instanceof Error ? error.message : "Unknown error",
+                    error: errorMessage,
                 }) + "\n"
             );
+
+            // Store error as assistant response in database asynchronously (fire and forget)
+            if (messages && chatId && authToken) {
+                // Don't await this - do it asynchronously to avoid blocking the response
+                void (async () => {
+                    try {
+                        // Fetch chat history and prepare messages for error storage
+                        const currentHistoryMessages = await fetchChatMessages(chatId, authToken);
+
+                        // Prepare base messages for error storage (convert to simple format for storage)
+                        const newUserMessages = messages.map((msg) => ({
+                            role: msg.role as "user" | "assistant",
+                            content:
+                                typeof msg.content === "string"
+                                    ? msg.content
+                                    : msg.content
+                                          .map((part) => {
+                                              if (part.type === "text") {
+                                                  return part.text ?? "";
+                                              } else if (part.type === "image_url") {
+                                                  return "[Image]";
+                                              } else if (part.type === "file") {
+                                                  return "[PDF]";
+                                              }
+                                              return "";
+                                          })
+                                          .filter(Boolean)
+                                          .join(" ")
+                                          .trim(),
+                        }));
+
+                        const baseMessages = [...currentHistoryMessages, ...newUserMessages];
+                        const errorMessages = [...baseMessages, { role: "assistant" as const, content: errorMessage }];
+
+                        await updateChatInBackend(chatId, errorMessages, authToken);
+                    } catch (dbError) {
+                        console.error("Failed to store error message in database:", dbError);
+                    }
+                })();
+            }
         }
     });
 });

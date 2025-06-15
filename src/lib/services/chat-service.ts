@@ -27,7 +27,6 @@ interface StreamingResponse {
 }
 
 const UPDATE_INTERVAL_MS = 50;
-const MAX_RETRY_ATTEMPTS = 3;
 
 const isStreamingResponse = (value: unknown): value is StreamingResponse => {
     if (typeof value !== "object" || value === null) return false;
@@ -244,62 +243,45 @@ export function useChatService() {
 
         let fullResponse = "";
         let lastUpdate = Date.now();
-        let attempt = 0;
-
-        const executeStream = async (): Promise<void> => {
-            try {
-                await streamChatResponse(
-                    apiMessages,
-                    currentChatId,
-                    modelId,
-                    authToken,
-                    webSearchEnabled,
-                    (chunk: string) => {
-                        fullResponse += chunk;
-                        const now = Date.now();
-                        if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
-                            updateMessage(currentChatId, assistantIndex, fullResponse);
-                            lastUpdate = now;
-                        }
-                    },
-                    (reasoning: string) => {
-                        updateMessageReasoning(currentChatId, assistantIndex, reasoning);
-                    },
-                    (response) => {
-                        // Stop streaming tracking first
-                        stopStreaming();
-                        updateMessage(currentChatId, assistantIndex, response);
-                        // Database update is now handled by the backend
-                        // No need to call updateMessages from frontend
-                    },
-                    (error: string) => {
-                        console.error("Stream error:", error);
-                        attempt += 1;
-                        if (attempt < MAX_RETRY_ATTEMPTS) {
-                            const backoffMs = 1000 * attempt;
-                            console.info(`Retrying stream in ${backoffMs}ms (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS})...`);
-                            setTimeout(() => void executeStream(), backoffMs);
-                        } else {
-                            stopStreaming();
-                            updateMessage(currentChatId, assistantIndex, `Error after ${MAX_RETRY_ATTEMPTS} attempts: ${error}`);
-                        }
-                    }
-                );
-            } catch (err: unknown) {
-                console.error("executeStream error", err instanceof Error ? err.message : err);
-                stopStreaming();
-                updateMessage(currentChatId, assistantIndex, "An error occurred while streaming the response");
-            }
-        };
 
         try {
-            await executeStream();
+            await streamChatResponse(
+                apiMessages,
+                currentChatId,
+                modelId,
+                authToken,
+                webSearchEnabled,
+                (chunk: string) => {
+                    fullResponse += chunk;
+                    const now = Date.now();
+                    if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
+                        updateMessage(currentChatId, assistantIndex, fullResponse);
+                        lastUpdate = now;
+                    }
+                },
+                (reasoning: string) => {
+                    updateMessageReasoning(currentChatId, assistantIndex, reasoning);
+                },
+                (response) => {
+                    // Stop streaming tracking first
+                    stopStreaming();
+                    updateMessage(currentChatId, assistantIndex, response);
+                    // Database update is now handled by the backend
+                    // No need to call updateMessages from frontend
+                },
+                (error: string) => {
+                    console.error("Stream error:", error);
+                    stopStreaming();
+                    updateMessage(currentChatId, assistantIndex, error);
+                }
+            );
             return currentChatId;
         } catch (error: unknown) {
             stopStreaming();
             const message = error instanceof Error ? error.message : "Unknown error";
             console.error("Send message error:", message);
-            throw new Error(message);
+            updateMessage(currentChatId, assistantIndex, message);
+            return currentChatId;
         }
     };
 
