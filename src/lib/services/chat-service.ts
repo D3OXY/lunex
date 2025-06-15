@@ -6,7 +6,17 @@ import { useAuth } from "@clerk/nextjs";
 
 interface Message {
     role: "user" | "assistant";
-    content: string;
+    content:
+        | string
+        | Array<{
+              type: "text" | "image_url" | "file";
+              text?: string;
+              image_url?: {
+                  url: string;
+              };
+              data?: string;
+              mimeType?: string;
+          }>;
 }
 
 interface StreamingResponse {
@@ -112,6 +122,8 @@ export function useChatService() {
         startStreaming,
         stopStreaming,
         webSearchEnabled,
+        attachments,
+        clearAttachments,
     } = useChatStore();
 
     const sendMessage = async (
@@ -156,22 +168,96 @@ export function useChatService() {
             throw new Error("Authentication token not available");
         }
 
-        // Add user message to the chat
-        addMessageToStore(currentChatId, { role: "user", content });
+        // Prepare user message content with attachments
+        let userMessageContent:
+            | string
+            | Array<{
+                  type: "text" | "image_url" | "file";
+                  text?: string;
+                  image_url?: { url: string };
+                  data?: string;
+                  mimeType?: string;
+              }>;
+
+        if (attachments.length > 0) {
+            // Multi-modal message with text and attachments
+            const contentParts: Array<{
+                type: "text" | "image_url" | "file";
+                text?: string;
+                image_url?: { url: string };
+                data?: string;
+                mimeType?: string;
+            }> = [];
+
+            // Add text content if present
+            if (content.trim()) {
+                contentParts.push({
+                    type: "text",
+                    text: content.trim(),
+                });
+            }
+
+            // Add attachments
+            attachments.forEach((attachment) => {
+                if (attachment.type === "image") {
+                    contentParts.push({
+                        type: "image_url",
+                        image_url: {
+                            url: attachment.url,
+                        },
+                    });
+                } else if (attachment.type === "pdf") {
+                    // For PDFs, use the file type with URL reference
+                    contentParts.push({
+                        type: "file",
+                        data: attachment.url, // UploadThing URL
+                        mimeType: "application/pdf",
+                    });
+                }
+            });
+
+            userMessageContent = contentParts;
+        } else {
+            // Simple text message
+            userMessageContent = content;
+        }
+
+        // Add user message to the chat (display version)
+        const displayContent = content + (attachments.length > 0 ? `\n${attachments.map((att) => `📎 ${att.name}`).join("\n")}` : "");
+
+        addMessageToStore(currentChatId, { role: "user", content: displayContent });
 
         // For new chats, we know the messages are just the user message we added
-        // For existing chats, get the current messages
+        // For existing chats, get the current messages and convert to API format
         const isNewChat = !chatId;
-        const baseMessages: Message[] = isNewChat ? [{ role: "user", content }] : (getCurrentChat()?.messages ?? [{ role: "user", content }]);
+        let baseMessages: Message[];
+
+        if (isNewChat) {
+            baseMessages = [{ role: "user", content: userMessageContent }];
+        } else {
+            const currentChat = getCurrentChat();
+            const chatMessages = currentChat?.messages ?? [];
+
+            // Convert existing messages to API format (keeping last few for context)
+            const recentMessages = chatMessages.slice(-10); // Keep last 10 messages for context
+            baseMessages = recentMessages.map((msg) => ({
+                role: msg.role,
+                content: msg.content,
+            }));
+
+            // Add the new user message
+            baseMessages.push({ role: "user", content: userMessageContent });
+        }
 
         // Add assistant placeholder and start streaming tracking
         addMessageToStore(currentChatId, { role: "assistant", content: "", isStreaming: true });
-        const assistantIndex = baseMessages.length;
+        const assistantIndex = isNewChat ? 1 : (getCurrentChat()?.messages.length ?? 1);
 
         // Start stream priority tracking
         startStreaming(currentChatId, assistantIndex);
 
-        const messages: Message[] = [...baseMessages];
+        // Clear attachments after preparing the message
+        clearAttachments();
 
         let fullResponse = "";
         let lastUpdate = Date.now();
@@ -180,7 +266,7 @@ export function useChatService() {
         const executeStream = async (): Promise<void> => {
             try {
                 await streamChatResponse(
-                    messages,
+                    baseMessages,
                     currentChatId,
                     modelId,
                     authToken,

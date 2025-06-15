@@ -70,9 +70,11 @@ app.post("/chat/stream", async (c) => {
             content:
                 | string
                 | Array<{
-                      type: "text" | "image_url";
+                      type: "text" | "image_url" | "file";
                       text?: string;
                       image_url?: { url: string };
+                      data?: string;
+                      mimeType?: string;
                   }>;
         }>;
         chatId?: string;
@@ -114,37 +116,73 @@ app.post("/chat/stream", async (c) => {
                 return;
             }
 
-            // Convert messages to CoreMessage format, handling both string and multi-modal content
-            const coreMessages: CoreMessage[] = [
-                { role: "system", content: SYSTEM_PROMPT },
-                ...messages.map((msg) => {
-                    const role = msg.role as "user" | "assistant" | "system";
+            // Helper function to fetch file from URL and convert to buffer
+            const fetchFileAsBuffer = async (url: string): Promise<Buffer> => {
+                console.log("Fetching file from URL:", url);
+                const response = await fetch(url);
+                if (!response.ok) {
+                    console.error(`Failed to fetch file from ${url}: ${response.status} ${response.statusText}`);
+                    throw new Error(`Failed to fetch file from ${url}: ${response.statusText}`);
+                }
+                const arrayBuffer = await response.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+                console.log(`Successfully fetched file: ${buffer.length} bytes`);
+                return buffer;
+            };
 
-                    // Handle multi-modal content for user messages
-                    if (role === "user" && Array.isArray(msg.content)) {
-                        // Convert our format to AI SDK format
-                        const content = msg.content.map((part) => {
-                            if (part.type === "text") {
-                                return { type: "text" as const, text: part.text ?? "" };
-                            } else if (part.type === "image_url") {
-                                return {
-                                    type: "image" as const,
-                                    image: new URL(part.image_url?.url ?? ""),
-                                };
+            // Convert messages to CoreMessage format, handling multi-modal content
+            const coreMessages: CoreMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
+
+            // Process each message
+            for (const msg of messages) {
+                const role = msg.role as "user" | "assistant" | "system";
+
+                // Handle multi-modal content for user messages
+                if (role === "user" && Array.isArray(msg.content)) {
+                    const content = [];
+
+                    for (const part of msg.content) {
+                        if (part.type === "text") {
+                            content.push({ type: "text" as const, text: part.text ?? "" });
+                        } else if (part.type === "image_url") {
+                            // For images, we can use URL directly
+                            content.push({
+                                type: "image" as const,
+                                image: new URL(part.image_url?.url ?? ""),
+                            });
+                        } else if (part.type === "file" && part.mimeType === "application/pdf") {
+                            // For PDFs, fetch the file and convert to buffer
+                            try {
+                                console.log("Processing PDF file:", part.data);
+                                const fileBuffer = await fetchFileAsBuffer(part.data ?? "");
+                                content.push({
+                                    type: "file" as const,
+                                    data: fileBuffer,
+                                    mimeType: "application/pdf",
+                                });
+                                console.log("Successfully added PDF to content");
+                            } catch (error) {
+                                console.error("Error fetching PDF file:", error);
+                                // Fallback to text description if file fetch fails
+                                content.push({
+                                    type: "text" as const,
+                                    text: `[Error: Could not process PDF file - ${error instanceof Error ? error.message : "Unknown error"}]`,
+                                });
                             }
-                            return { type: "text" as const, text: "" };
-                        });
-
-                        return { role, content };
+                        }
                     }
 
+                    coreMessages.push({ role, content });
+                } else {
                     // Handle simple string content
-                    return {
+                    coreMessages.push({
                         role,
                         content: typeof msg.content === "string" ? msg.content : "",
-                    };
-                }),
-            ];
+                    });
+                }
+            }
+
+            console.log("Final coreMessages:", JSON.stringify(coreMessages, null, 2));
 
             // check if modelId is a valid model id
             if (!modelId || !Object.keys(MODELS).includes(modelId)) {
@@ -182,10 +220,13 @@ app.post("/chat/stream", async (c) => {
                                   if (part.type === "text") {
                                       return part.text ?? "";
                                   } else if (part.type === "image_url") {
-                                      return `[Image: ${part.image_url?.url ?? ""}]`;
+                                      return `[Image]`;
+                                  } else if (part.type === "file") {
+                                      return `[${part.mimeType === "application/pdf" ? "PDF" : "File"}]`;
                                   }
                                   return "";
                               })
+                              .filter(Boolean)
                               .join(" ")
                               .trim(),
             }));
