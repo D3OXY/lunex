@@ -285,8 +285,67 @@ export function useChatService() {
         }
     };
 
+    const regenerateMessage = async (modelId: string, chatId: Id<"chats">): Promise<void> => {
+        // Get auth token for API calls with Convex audience
+        const authToken = await getToken({ template: "convex" });
+        if (!authToken) {
+            throw new Error("Authentication token not available");
+        }
+
+        // Don't add a user message - just generate AI response based on existing conversation
+        // The backend will fetch the full conversation history
+
+        // Add assistant placeholder and start streaming tracking
+        addMessageToStore(chatId, { role: "assistant", content: "", isStreaming: true });
+        const assistantIndex = (getCurrentChat()?.messages.length ?? 1) - 1;
+
+        // Start stream priority tracking
+        startStreaming(chatId, assistantIndex);
+
+        let fullResponse = "";
+        let lastUpdate = Date.now();
+
+        try {
+            // Send empty messages array - backend will fetch full history
+            await streamChatResponse(
+                [], // Empty array since we're regenerating based on existing history
+                chatId,
+                modelId,
+                authToken,
+                webSearchEnabled,
+                (chunk: string) => {
+                    fullResponse += chunk;
+                    const now = Date.now();
+                    if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
+                        updateMessage(chatId, assistantIndex, fullResponse);
+                        lastUpdate = now;
+                    }
+                },
+                (reasoning: string) => {
+                    updateMessageReasoning(chatId, assistantIndex, reasoning);
+                },
+                (response) => {
+                    // Stop streaming tracking first
+                    stopStreaming();
+                    updateMessage(chatId, assistantIndex, response);
+                },
+                (error: string) => {
+                    console.error("Stream error:", error);
+                    stopStreaming();
+                    updateMessage(chatId, assistantIndex, error);
+                }
+            );
+        } catch (error: unknown) {
+            stopStreaming();
+            const message = error instanceof Error ? error.message : "Unknown error";
+            console.error("Regenerate message error:", message);
+            updateMessage(chatId, assistantIndex, message);
+        }
+    };
+
     return {
         sendMessage,
+        regenerateMessage,
         createChat,
         updateChatTitle,
         deleteChat,

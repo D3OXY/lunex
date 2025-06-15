@@ -23,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUser } from "@clerk/nextjs";
-import { Copy, Edit3, GitBranch, GlobeIcon } from "lucide-react";
+import { Copy, Edit3, GitBranch, GlobeIcon, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 interface ChatInterfaceProps {
@@ -47,7 +47,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     const webSearchEnabled = useWebSearchEnabled();
 
     // Service hooks
-    const { sendMessage } = useChatService();
+    const { sendMessage, regenerateMessage } = useChatService();
 
     // Sync context
     const { currentUser, isLoading } = useSyncContext();
@@ -58,6 +58,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     // Branching functionality
     const branchChat = useMutation(api.chats.branchChat);
     const editMessage = useMutation(api.chats.editMessage);
+    const regenerateResponse = useMutation(api.chats.regenerateResponse);
 
     const navigate = useNavigate();
 
@@ -174,6 +175,36 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
         setEditedContent("");
     };
 
+    const handleRegenerateResponse = async (messageIndex: number): Promise<void> => {
+        if (!chatId || !currentUser?._id) return;
+
+        setIsSubmitting(true);
+        try {
+            // Use the regenerateResponse mutation to truncate messages up to the AI message
+            await regenerateResponse({
+                chatId,
+                messageIndex,
+            });
+
+            // Update UI state immediately to remove the old AI response
+            // This will trigger a re-render and remove the old message from the UI
+            if (currentChat) {
+                const truncatedMessages = currentChat.messages.slice(0, messageIndex);
+                // Update the chat in the store to reflect the truncation
+                useChatStore.getState().updateChat(chatId, { messages: truncatedMessages });
+            }
+
+            // Regenerate the AI response without adding a new user message
+            await regenerateMessage(selectedModel, chatId);
+        } catch (error) {
+            console.error("Failed to regenerate response:", error);
+            const message = error instanceof Error ? error.message : "Failed to regenerate response";
+            toast.error(message);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const allMessages = currentChat?.messages ?? [];
 
     if (isLoading || !currentUser) {
@@ -246,6 +277,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                                                                 size="sm"
                                                                                 className="h-7 w-7 p-0 opacity-50 hover:opacity-100"
                                                                                 onClick={() => handleCopyResponse(msg.content)}
+                                                                                disabled={isSubmitting || isStreaming}
                                                                             >
                                                                                 <Copy className="h-3.5 w-3.5" />
                                                                             </Button>
@@ -261,6 +293,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                                                                 size="sm"
                                                                                 className="h-7 w-7 p-0 opacity-50 hover:opacity-100"
                                                                                 onClick={() => handleBranchFromMessage(index)}
+                                                                                disabled={isSubmitting || isStreaming}
                                                                             >
                                                                                 <GitBranch className="h-3.5 w-3.5" />
                                                                             </Button>
@@ -269,6 +302,25 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                                                             <p>Branch from here</p>
                                                                         </TooltipContent>
                                                                     </Tooltip>
+                                                                    {/* Show regenerate button only for the last AI response */}
+                                                                    {index === allMessages.length - 1 && (
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    className="h-7 w-7 p-0 opacity-50 hover:opacity-100"
+                                                                                    onClick={() => handleRegenerateResponse(index)}
+                                                                                    disabled={isSubmitting || isStreaming}
+                                                                                >
+                                                                                    <RotateCcw className="h-3.5 w-3.5" />
+                                                                                </Button>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent>
+                                                                                <p>Regenerate response</p>
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    )}
                                                                 </>
                                                             )}
                                                             {msg.role === "user" && (
@@ -279,6 +331,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
                                                                             size="sm"
                                                                             className="h-7 w-7 p-0 opacity-50 hover:opacity-100"
                                                                             onClick={() => handleEditMessage(index, msg.content)}
+                                                                            disabled={isSubmitting || isStreaming}
                                                                         >
                                                                             <Edit3 className="h-3.5 w-3.5" />
                                                                         </Button>

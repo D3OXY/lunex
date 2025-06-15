@@ -294,6 +294,44 @@ export const editMessage = mutation({
     },
 });
 
+// Regenerate an assistant response by truncating from that point
+export const regenerateResponse = mutation({
+    args: {
+        chatId: v.id("chats"),
+        messageIndex: v.number(),
+    },
+    handler: async (ctx, { chatId, messageIndex }) => {
+        const currentUser = await getUserOrThrow(ctx);
+        const chat = await ctx.table("chats").get(chatId);
+        if (!chat) {
+            throw new ConvexError("Chat not found");
+        }
+        if (chat.userId !== currentUser._id) {
+            throw new ConvexError("Forbidden");
+        }
+
+        // Validate message index
+        if (messageIndex < 0 || messageIndex >= chat.messages.length) {
+            throw new ConvexError("Invalid message index");
+        }
+
+        // Ensure we're regenerating an assistant message
+        const targetMessage = chat.messages[messageIndex];
+        if (targetMessage.role !== "assistant") {
+            throw new ConvexError("Can only regenerate assistant messages");
+        }
+
+        // Truncate messages up to (but not including) the assistant message to be regenerated
+        const truncatedMessages = chat.messages.slice(0, messageIndex);
+
+        await ctx.table("chats").getX(chatId).patch({
+            messages: truncatedMessages,
+        });
+
+        return { success: true };
+    },
+});
+
 // Branch a chat from a specific assistant message
 export const branchChat = mutation({
     args: {
