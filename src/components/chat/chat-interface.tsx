@@ -145,18 +145,21 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
         setIsSubmitting(true);
         try {
-            // Use secure mutation to edit the message
+            // Store the edited content before resetting state
+            const contentToSend = editedContent.trim();
+
+            // Reset editing state first
+            setEditingMessageIndex(null);
+            setEditedContent("");
+
+            // Use secure mutation to truncate messages up to the edited message
             await editMessage({
                 chatId,
                 messageIndex: editingMessageIndex,
-                newContent: editedContent.trim(),
             });
 
-            // Send the edited message to get AI response
-            await sendMessage(editedContent.trim(), selectedModel, chatId, currentUser._id);
-
-            setEditingMessageIndex(null);
-            setEditedContent("");
+            // Send the new message content to get AI response
+            await sendMessage(contentToSend, selectedModel, chatId, currentUser._id);
         } catch (error) {
             console.error("Failed to regenerate response:", error);
             const message = error instanceof Error ? error.message : "Failed to regenerate response";

@@ -261,9 +261,8 @@ export const editMessage = mutation({
     args: {
         chatId: v.id("chats"),
         messageIndex: v.number(),
-        newContent: v.string(),
     },
-    handler: async (ctx, { chatId, messageIndex, newContent }) => {
+    handler: async (ctx, { chatId, messageIndex }) => {
         const currentUser = await getUserOrThrow(ctx);
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
@@ -284,18 +283,11 @@ export const editMessage = mutation({
             throw new ConvexError("Can only edit user messages");
         }
 
-        // Validate content
-        if (!newContent?.trim()) {
-            throw new ConvexError("Message content cannot be empty");
-        }
-
-        // Truncate messages up to and including the edited message, then update the content
+        // Truncate messages up to (but not including) the edited message - 1 since we need to delete the users message aswell
         const truncatedMessages = chat.messages.slice(0, messageIndex);
-        const editedMessage = { ...targetMessage, content: newContent.trim() };
-        const updatedMessages = [...truncatedMessages, editedMessage];
 
         await ctx.table("chats").getX(chatId).patch({
-            messages: updatedMessages,
+            messages: truncatedMessages,
         });
 
         return { success: true };
