@@ -102,123 +102,125 @@ export function ModelPicker(): React.JSX.Element {
                 </Button>
             </DrawerTrigger>
             <DrawerContent className="max-h-[80vh]">
-                <DrawerHeader>
-                    <DrawerTitle>Choose AI Model</DrawerTitle>
-                </DrawerHeader>
+                <div className="mx-auto w-full max-w-4xl">
+                    <DrawerHeader>
+                        <DrawerTitle>Choose AI Model</DrawerTitle>
+                    </DrawerHeader>
 
-                <div className="space-y-4 px-4 pb-4">
-                    {/* Search */}
-                    <div className="relative">
-                        <Search size={16} className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2 transform" />
-                        <Input placeholder="Search models..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
-                    </div>
-
-                    {/* Provider Filter */}
-                    <div>
-                        <div className="mb-2 text-sm font-medium">Provider</div>
-                        <div className="flex gap-2 overflow-x-auto pb-2">
-                            {providers.map((provider) => (
-                                <Button
-                                    key={provider}
-                                    variant={selectedProvider === provider ? "default" : "outline"}
-                                    size="sm"
-                                    onClick={() => setSelectedProvider(provider)}
-                                    className="flex-shrink-0"
-                                >
-                                    {provider === "User" && <User size={14} className="mr-1" />}
-                                    {provider}
-                                </Button>
-                            ))}
+                    <div className="space-y-4 px-6 pb-6">
+                        {/* Search */}
+                        <div className="relative">
+                            <Search size={16} className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2 transform" />
+                            <Input placeholder="Search models..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
                         </div>
-                    </div>
 
-                    {/* Feature Filter */}
-                    <div>
-                        <div className="mb-2 text-sm font-medium">Capabilities</div>
-                        <div className="flex gap-2 overflow-x-auto pb-2">
-                            {availableFeatures.map((feature) => (
-                                <Button
-                                    key={feature}
-                                    variant={selectedFeature === feature ? "default" : "outline"}
-                                    size="sm"
-                                    onClick={() => setSelectedFeature(feature)}
-                                    className="flex-shrink-0"
-                                >
-                                    {feature === "Vision" && <ImageIcon size={14} className="mr-1" />}
-                                    {feature === "Reasoning" && <Brain size={14} className="mr-1" />}
-                                    {feature === "Coding" && <Code size={14} className="mr-1" />}
-                                    {feature === "Self-Moderated" && <Shield size={14} className="mr-1" />}
-                                    {feature === "Free" && <Sparkles size={14} className="mr-1" />}
-                                    {feature}
-                                </Button>
-                            ))}
+                        {/* Provider Filter */}
+                        <div>
+                            <div className="mb-2 text-sm font-medium">Provider</div>
+                            <div className="flex gap-2 overflow-x-auto pb-2">
+                                {providers.map((provider) => (
+                                    <Button
+                                        key={provider}
+                                        variant={selectedProvider === provider ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => setSelectedProvider(provider)}
+                                        className="flex-shrink-0"
+                                    >
+                                        {provider === "User" && <User size={14} className="mr-1" />}
+                                        {provider}
+                                    </Button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Models List */}
-                    <ScrollArea className="h-[400px]">
-                        <div className="space-y-2">
-                            {filteredModels.length === 0 ? (
-                                <div className="text-muted-foreground py-8 text-center">No models found</div>
-                            ) : (
-                                filteredModels.map(([modelId, model]) => {
-                                    const features: ModelFeatures = model.features ?? {};
-                                    return (
-                                        <Button key={modelId} variant="ghost" className="h-auto w-full justify-between p-4" onClick={() => handleModelSelect(modelId)}>
-                                            <div className="flex flex-1 flex-col items-start gap-2">
-                                                <div className="flex w-full items-center gap-2">
-                                                    <span className="font-medium">{model.name}</span>
-                                                    {model.provider === "User" && (
-                                                        <Badge variant="secondary" className="text-xs">
-                                                            Custom
-                                                        </Badge>
-                                                    )}
-                                                    {features.free && (
-                                                        <Badge variant="outline" className="text-xs text-green-600">
-                                                            Free
-                                                        </Badge>
-                                                    )}
-                                                </div>
+                        {/* Feature Filter */}
+                        <div>
+                            <div className="mb-2 text-sm font-medium">Capabilities</div>
+                            <div className="flex gap-2 overflow-x-auto pb-2">
+                                {availableFeatures.map((feature) => (
+                                    <Button
+                                        key={feature}
+                                        variant={selectedFeature === feature ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => setSelectedFeature(feature)}
+                                        className="flex-shrink-0"
+                                    >
+                                        {feature === "Vision" && <ImageIcon size={14} className="mr-1" />}
+                                        {feature === "Reasoning" && <Brain size={14} className="mr-1" />}
+                                        {feature === "Coding" && <Code size={14} className="mr-1" />}
+                                        {feature === "Self-Moderated" && <Shield size={14} className="mr-1" />}
+                                        {feature === "Free" && <Sparkles size={14} className="mr-1" />}
+                                        {feature}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
 
-                                                <div className="text-muted-foreground font-mono text-xs">{modelId}</div>
-
-                                                {/* Features */}
-                                                {(features.imageInput || features.reasoning || features.coding || features.selfModerated) && (
-                                                    <div className="mt-1 flex flex-wrap gap-2">
-                                                        {features.imageInput && (
-                                                            <div className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                                                                <ImageIcon size={12} />
-                                                                <span>Vision</span>
-                                                            </div>
+                        {/* Models List */}
+                        <ScrollArea className="h-[400px]">
+                            <div className="space-y-2">
+                                {filteredModels.length === 0 ? (
+                                    <div className="text-muted-foreground py-8 text-center">No models found</div>
+                                ) : (
+                                    filteredModels.map(([modelId, model]) => {
+                                        const features: ModelFeatures = model.features ?? {};
+                                        return (
+                                            <Button key={modelId} variant="ghost" className="h-auto w-full justify-between p-4" onClick={() => handleModelSelect(modelId)}>
+                                                <div className="flex flex-1 flex-col items-start gap-2">
+                                                    <div className="flex w-full items-center gap-2">
+                                                        <span className="font-medium">{model.name}</span>
+                                                        {model.provider === "User" && (
+                                                            <Badge variant="secondary" className="text-xs">
+                                                                Custom
+                                                            </Badge>
                                                         )}
-                                                        {features.reasoning && (
-                                                            <div className="flex items-center gap-1 rounded-md bg-purple-50 px-2 py-1 text-xs text-purple-700 dark:bg-purple-950 dark:text-purple-300">
-                                                                <Brain size={12} />
-                                                                <span>Reasoning</span>
-                                                            </div>
-                                                        )}
-                                                        {features.coding && (
-                                                            <div className="flex items-center gap-1 rounded-md bg-green-50 px-2 py-1 text-xs text-green-700 dark:bg-green-950 dark:text-green-300">
-                                                                <Code size={12} />
-                                                                <span>Coding</span>
-                                                            </div>
-                                                        )}
-                                                        {features.selfModerated && (
-                                                            <div className="flex items-center gap-1 rounded-md bg-orange-50 px-2 py-1 text-xs text-orange-700 dark:bg-orange-950 dark:text-orange-300">
-                                                                <Shield size={12} />
-                                                                <span>Self-Moderated</span>
-                                                            </div>
+                                                        {features.free && (
+                                                            <Badge variant="outline" className="text-xs text-green-600">
+                                                                Free
+                                                            </Badge>
                                                         )}
                                                     </div>
-                                                )}
-                                            </div>
-                                            {selectedModel === modelId && <Check size={16} className="text-primary flex-shrink-0" />}
-                                        </Button>
-                                    );
-                                })
-                            )}
-                        </div>
-                    </ScrollArea>
+
+                                                    <div className="text-muted-foreground font-mono text-xs">{modelId}</div>
+
+                                                    {/* Features */}
+                                                    {(features.imageInput || features.reasoning || features.coding || features.selfModerated) && (
+                                                        <div className="mt-1 flex flex-wrap gap-2">
+                                                            {features.imageInput && (
+                                                                <div className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                                                                    <ImageIcon size={12} />
+                                                                    <span>Vision</span>
+                                                                </div>
+                                                            )}
+                                                            {features.reasoning && (
+                                                                <div className="flex items-center gap-1 rounded-md bg-purple-50 px-2 py-1 text-xs text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                                                                    <Brain size={12} />
+                                                                    <span>Reasoning</span>
+                                                                </div>
+                                                            )}
+                                                            {features.coding && (
+                                                                <div className="flex items-center gap-1 rounded-md bg-green-50 px-2 py-1 text-xs text-green-700 dark:bg-green-950 dark:text-green-300">
+                                                                    <Code size={12} />
+                                                                    <span>Coding</span>
+                                                                </div>
+                                                            )}
+                                                            {features.selfModerated && (
+                                                                <div className="flex items-center gap-1 rounded-md bg-orange-50 px-2 py-1 text-xs text-orange-700 dark:bg-orange-950 dark:text-orange-300">
+                                                                    <Shield size={12} />
+                                                                    <span>Self-Moderated</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {selectedModel === modelId && <Check size={16} className="text-primary flex-shrink-0" />}
+                                            </Button>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </ScrollArea>
+                    </div>
                 </div>
             </DrawerContent>
         </Drawer>
