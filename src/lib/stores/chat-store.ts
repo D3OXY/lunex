@@ -108,7 +108,8 @@ export const useChatStore = create<ChatState>()(
                 const mergedChats = serverChats.map((serverChat) => {
                     const localChat = localChatsMap.get(serverChat._id);
                     if (localChat) {
-                        // If this specific chat is currently streaming, prioritize local state
+                        // If this specific chat is currently streaming, prioritize local state completely
+                        // This prevents server data from overriding streaming content prematurely
                         if (state.activeStreamChatId === serverChat._id && state.isStreaming) {
                             return {
                                 ...serverChat,
@@ -116,20 +117,23 @@ export const useChatStore = create<ChatState>()(
                             };
                         }
 
-                        // If not streaming or different chat, prefer server data if it has more content
-                        // This handles the case where server has been updated during refresh
+                        // If not streaming, check if we should use server data
                         const serverHasMoreMessages = serverChat.messages.length > localChat.messages.length;
                         const serverLastMessage = serverChat.messages[serverChat.messages.length - 1];
                         const localLastMessage = localChat.messages[localChat.messages.length - 1];
 
-                        // Check if server has more recent or complete content
-                        const serverHasMoreContent =
+                        // Only use server data if it has significantly more content or different structure
+                        // This prevents premature replacement of streaming content
+                        const serverHasSignificantlyMoreContent =
                             serverLastMessage &&
                             localLastMessage &&
                             serverLastMessage.role === localLastMessage.role &&
-                            serverLastMessage.content.length > localLastMessage.content.length;
+                            serverLastMessage.content.length > localLastMessage.content.length + 10; // Add buffer to prevent premature replacement
 
-                        const shouldUseServerMessages = Boolean(serverHasMoreMessages || serverHasMoreContent || !state.isStreaming);
+                        // Check if the local message is marked as streaming - if so, don't replace it
+                        const localMessageIsStreaming = localLastMessage?.isStreaming === true;
+
+                        const shouldUseServerMessages = Boolean(serverHasMoreMessages || (serverHasSignificantlyMoreContent && !localMessageIsStreaming));
 
                         return {
                             ...serverChat,
@@ -225,10 +229,31 @@ export const useChatStore = create<ChatState>()(
             }),
 
         stopStreaming: () =>
-            set({
-                activeStreamChatId: null,
-                streamingMessageIndex: null,
-                isStreaming: false,
+            set((state) => {
+                // Clear the isStreaming flag from the message that was being streamed
+                if (state.activeStreamChatId && state.streamingMessageIndex !== null) {
+                    const updatedChats = state.chats.map((chat) =>
+                        chat._id === state.activeStreamChatId
+                            ? {
+                                  ...chat,
+                                  messages: chat.messages.map((msg, index) => (index === state.streamingMessageIndex ? { ...msg, isStreaming: false } : msg)),
+                              }
+                            : chat
+                    );
+
+                    return {
+                        activeStreamChatId: null,
+                        streamingMessageIndex: null,
+                        isStreaming: false,
+                        chats: updatedChats,
+                    };
+                }
+
+                return {
+                    activeStreamChatId: null,
+                    streamingMessageIndex: null,
+                    isStreaming: false,
+                };
             }),
 
         // Utilities

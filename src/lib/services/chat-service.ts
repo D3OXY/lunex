@@ -26,7 +26,7 @@ interface StreamingResponse {
     supportsReasoning?: boolean;
 }
 
-const UPDATE_INTERVAL_MS = 50;
+const UPDATE_INTERVAL_MS = 25;
 
 const isStreamingResponse = (value: unknown): value is StreamingResponse => {
     if (typeof value !== "object" || value === null) return false;
@@ -254,7 +254,11 @@ export function useChatService() {
                 (chunk: string) => {
                     fullResponse += chunk;
                     const now = Date.now();
-                    if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
+
+                    // Always update on first chunk for immediate visual feedback
+                    const isFirstChunk = fullResponse === chunk;
+
+                    if (isFirstChunk || now - lastUpdate >= UPDATE_INTERVAL_MS) {
                         updateMessage(currentChatId, assistantIndex, fullResponse);
                         lastUpdate = now;
                     }
@@ -316,7 +320,11 @@ export function useChatService() {
                 (chunk: string) => {
                     fullResponse += chunk;
                     const now = Date.now();
-                    if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
+
+                    // Always update on first chunk for immediate visual feedback
+                    const isFirstChunk = fullResponse === chunk;
+
+                    if (isFirstChunk || now - lastUpdate >= UPDATE_INTERVAL_MS) {
                         updateMessage(chatId, assistantIndex, fullResponse);
                         lastUpdate = now;
                     }
