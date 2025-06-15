@@ -57,7 +57,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
     // Branching functionality
     const branchChat = useMutation(api.chats.branchChat);
-    const updateChatMessages = useMutation(api.chats.updateChatMessages);
+    const editMessage = useMutation(api.chats.editMessage);
 
     const navigate = useNavigate();
 
@@ -145,30 +145,22 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
 
         setIsSubmitting(true);
         try {
-            // Truncate messages after the edited message
-            const truncatedMessages = currentChat?.messages.slice(0, editingMessageIndex) ?? [];
-
-            // Update the chat in the database with truncated messages
-            await updateChatMessages({
+            // Use secure mutation to edit the message
+            await editMessage({
                 chatId,
-                messages: truncatedMessages.map((msg) => ({
-                    role: msg.role,
-                    content: msg.content,
-                })),
+                messageIndex: editingMessageIndex,
+                newContent: editedContent.trim(),
             });
 
-            // Update local store
-            const { updateChat } = useChatStore.getState();
-            updateChat(chatId, { messages: truncatedMessages });
-
-            // Send the edited message
+            // Send the edited message to get AI response
             await sendMessage(editedContent.trim(), selectedModel, chatId, currentUser._id);
 
             setEditingMessageIndex(null);
             setEditedContent("");
         } catch (error) {
             console.error("Failed to regenerate response:", error);
-            toast.error("Failed to regenerate response");
+            const message = error instanceof Error ? error.message : "Failed to regenerate response";
+            toast.error(message);
         } finally {
             setIsSubmitting(false);
         }

@@ -256,18 +256,14 @@ export const updateChatVisibility = mutation({
     },
 });
 
-// Update chat messages (for editing functionality)
-export const updateChatMessages = mutation({
+// Edit a user message and truncate conversation from that point
+export const editMessage = mutation({
     args: {
         chatId: v.id("chats"),
-        messages: v.array(
-            v.object({
-                role: v.union(v.literal("user"), v.literal("assistant")),
-                content: v.string(),
-            })
-        ),
+        messageIndex: v.number(),
+        newContent: v.string(),
     },
-    handler: async (ctx, { chatId, messages }) => {
+    handler: async (ctx, { chatId, messageIndex, newContent }) => {
         const currentUser = await getUserOrThrow(ctx);
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
@@ -277,8 +273,29 @@ export const updateChatMessages = mutation({
             throw new ConvexError("Forbidden");
         }
 
+        // Validate message index
+        if (messageIndex < 0 || messageIndex >= chat.messages.length) {
+            throw new ConvexError("Invalid message index");
+        }
+
+        // Ensure we're only editing user messages
+        const targetMessage = chat.messages[messageIndex];
+        if (targetMessage.role !== "user") {
+            throw new ConvexError("Can only edit user messages");
+        }
+
+        // Validate content
+        if (!newContent?.trim()) {
+            throw new ConvexError("Message content cannot be empty");
+        }
+
+        // Truncate messages up to and including the edited message, then update the content
+        const truncatedMessages = chat.messages.slice(0, messageIndex);
+        const editedMessage = { ...targetMessage, content: newContent.trim() };
+        const updatedMessages = [...truncatedMessages, editedMessage];
+
         await ctx.table("chats").getX(chatId).patch({
-            messages,
+            messages: updatedMessages,
         });
 
         return { success: true };
