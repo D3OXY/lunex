@@ -82,4 +82,64 @@ http.route({
     }),
 });
 
+http.route({
+    path: "/get-chat-messages",
+    method: "POST",
+    handler: httpAction(async (ctx, request) => {
+        try {
+            // Verify authorization header is present
+            const authHeader = request.headers.get("Authorization");
+            if (!authHeader?.startsWith("Bearer ")) {
+                return new Response(JSON.stringify({ error: "Missing or invalid authorization header" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+
+            // Verify the user identity using the JWT token from Clerk
+            const identity = await ctx.auth.getUserIdentity();
+            if (!identity) {
+                return new Response(JSON.stringify({ error: "Unauthorized" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+
+            // Parse and validate request body
+            const { chatId } = (await request.json()) as { chatId: Id<"chats"> };
+
+            if (!chatId) {
+                return new Response(JSON.stringify({ error: "Missing chatId" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+
+            // Verify that the authenticated user owns the chat
+            const chat = await ctx.runQuery(internal.chats.getChatForUser, {
+                chatId,
+                userId: identity.subject, // Clerk user ID
+            });
+
+            if (!chat) {
+                return new Response(JSON.stringify({ error: "Chat not found or access denied" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+
+            return new Response(JSON.stringify({ messages: chat.messages }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+            });
+        } catch (error) {
+            console.error("Error fetching chat messages:", error);
+            return new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
+            });
+        }
+    }),
+});
+
 export default http;

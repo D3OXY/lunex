@@ -229,30 +229,8 @@ export function useChatService() {
 
         addMessageToStore(currentChatId, { role: "user", content: displayContent });
 
-        // Prepare messages for API - include conversation context
-        const isNewChat = !chatId;
-        let apiMessages: Message[];
-
-        if (isNewChat) {
-            // For new chats, only send the current message
-            apiMessages = [{ role: "user", content: userMessageContent }];
-        } else {
-            // For existing chats, include conversation context
-            const currentChat = getCurrentChat();
-            const chatMessages = currentChat?.messages ?? [];
-
-            // Get conversation history (excluding the message we just added)
-            const historyMessages = chatMessages.slice(0, -1);
-
-            // Convert to API format, but be careful with attachments
-            const contextMessages: Message[] = historyMessages.map((msg) => ({
-                role: msg.role,
-                content: msg.content, // Use the stored content as-is for context
-            }));
-
-            // Add the new user message with proper format
-            apiMessages = [...contextMessages, { role: "user", content: userMessageContent }];
-        }
+        // Prepare messages for API - backend will fetch history as needed
+        const apiMessages: Message[] = [{ role: "user", content: userMessageContent }];
 
         // Add assistant placeholder and start streaming tracking
         addMessageToStore(currentChatId, { role: "assistant", content: "", isStreaming: true });

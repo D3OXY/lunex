@@ -62,6 +62,37 @@ const updateChatInBackend = async (chatId: string, messages: Array<{ role: "user
     }
 };
 
+// Helper function to fetch existing chat messages from Convex
+const fetchChatMessages = async (chatId: string, authToken: string): Promise<Array<{ role: "user" | "assistant"; content: string }>> => {
+    try {
+        const convexSiteUrl = env.NEXT_PUBLIC_CONVEX_URL.replace(".convex.cloud", ".convex.site");
+
+        const response = await fetch(`${convexSiteUrl}/get-chat-messages`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ chatId }),
+        });
+
+        if (!response.ok) {
+            const errorData = (await response.json()) as { error?: string };
+            console.error("Failed to fetch chat messages:", errorData);
+            return [];
+        }
+
+        const data = (await response.json()) as { messages: Array<{ role: "user" | "assistant"; content: string }> };
+        return data.messages ?? [];
+    } catch (error) {
+        console.error("Error fetching chat messages:", error);
+        return [];
+    }
+};
+
+// Maximum number of historical messages to include in LLM context
+const MAX_HISTORY_MESSAGES = 20;
+
 // Chat streaming endpoint with OpenRouter
 app.post("/chat/stream", async (c) => {
     const body: {
@@ -116,6 +147,9 @@ app.post("/chat/stream", async (c) => {
                 return;
             }
 
+            // Fetch chat history from Convex (limited to last N messages)
+            const historyMessages = (await fetchChatMessages(chatId, authToken)).slice(-MAX_HISTORY_MESSAGES);
+
             // Helper function to fetch file from URL and convert to buffer
             const fetchFileAsBuffer = async (url: string): Promise<Buffer> => {
                 const response = await fetch(url);
@@ -129,7 +163,12 @@ app.post("/chat/stream", async (c) => {
             // Convert messages to CoreMessage format, handling multi-modal content
             const coreMessages: CoreMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
 
-            // Process each message
+            // Append history to coreMessages
+            for (const hist of historyMessages) {
+                coreMessages.push({ role: hist.role, content: hist.content });
+            }
+
+            // Process incoming user message(s) (expected to be only the new message)
             for (const msg of messages) {
                 const role = msg.role as "user" | "assistant" | "system";
 
@@ -141,13 +180,11 @@ app.post("/chat/stream", async (c) => {
                         if (part.type === "text") {
                             content.push({ type: "text" as const, text: part.text ?? "" });
                         } else if (part.type === "image_url") {
-                            // For images, we can use URL directly
                             content.push({
                                 type: "image" as const,
                                 image: new URL(part.image_url?.url ?? ""),
                             });
                         } else if (part.type === "file" && part.mimeType === "application/pdf") {
-                            // For PDFs, fetch the file and convert to buffer
                             try {
                                 const fileBuffer = await fetchFileAsBuffer(part.data ?? "");
                                 content.push({
@@ -157,7 +194,6 @@ app.post("/chat/stream", async (c) => {
                                 });
                             } catch (error) {
                                 console.error("Error fetching PDF file:", error);
-                                // Fallback to text description if file fetch fails
                                 content.push({
                                     type: "text" as const,
                                     text: `[Error: Could not process PDF file - ${error instanceof Error ? error.message : "Unknown error"}]`,
@@ -168,7 +204,6 @@ app.post("/chat/stream", async (c) => {
 
                     coreMessages.push({ role, content });
                 } else {
-                    // Handle simple string content
                     coreMessages.push({
                         role,
                         content: typeof msg.content === "string" ? msg.content : "",
@@ -202,7 +237,7 @@ app.post("/chat/stream", async (c) => {
             let isUpdating = false;
 
             // Prepare base messages for incremental updates (convert to simple format for storage)
-            const baseMessages = messages.map((msg) => ({
+            const newUserMessages = messages.map((msg) => ({
                 role: msg.role as "user" | "assistant",
                 content:
                     typeof msg.content === "string"
@@ -222,6 +257,8 @@ app.post("/chat/stream", async (c) => {
                               .join(" ")
                               .trim(),
             }));
+
+            const baseMessages = [...historyMessages, ...newUserMessages];
 
             // Stream the response using AI SDK's built-in reasoning support
             for await (const part of result.fullStream) {
