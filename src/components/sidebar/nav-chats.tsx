@@ -19,7 +19,7 @@ import { useChatService } from "@/lib/services/chat-service";
 import type { Chat } from "@/lib/stores/chat-store";
 import { useChats, useChatStore } from "@/lib/stores/chat-store";
 import { cn } from "@/lib/utils";
-import { GitBranchIcon, MessageSquareIcon, PenLine, X } from "lucide-react";
+import { GitBranchIcon, MessageSquareIcon, PenLine, X, Globe } from "lucide-react";
 import type { HTMLAttributes, ReactElement } from "react";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -169,7 +169,12 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
             >
                 <Link to={href} className={cn("flex min-h-0 w-full items-center gap-2 overflow-hidden p-2", !sidebarOpen && "justify-center")}>
                     {chatIcon}
-                    {sidebarOpen && <div className="group-hover:text-foreground min-w-0 flex-1 truncate text-xs font-medium transition-colors duration-200">{chat.title}</div>}
+                    {sidebarOpen && (
+                        <div className="group-hover:text-foreground flex min-w-0 flex-1 items-center gap-1 truncate text-xs font-medium transition-colors duration-200">
+                            <span className="truncate">{chat.title}</span>
+                            {chat.visibility === "public" && <Globe className="text-muted-foreground h-3 w-3 flex-shrink-0" />}
+                        </div>
+                    )}
                 </Link>
 
                 {sidebarOpen && isHovered && (
@@ -209,7 +214,15 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
                     <TooltipTrigger asChild>{chatItem}</TooltipTrigger>
                     <TooltipContent side="right" className="max-w-xs">
                         <p className="font-medium">{chat.title}</p>
-                        {chat.branched && <p className="text-muted-foreground text-xs">Branch</p>}
+                        <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                            {chat.branched && <span>Branch</span>}
+                            {chat.visibility === "public" && (
+                                <span className="flex items-center gap-1">
+                                    <Globe className="h-3 w-3" />
+                                    Public
+                                </span>
+                            )}
+                        </div>
                     </TooltipContent>
                 </Tooltip>
             );

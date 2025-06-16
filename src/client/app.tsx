@@ -13,7 +13,7 @@ export default function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/chat/:id" element={<Chat />} />
-                <Route path="/shared-chat/:id" element={<SharedChat />} />
+                <Route path="/shared/:id" element={<SharedChat />} />
                 <Route path="*" element={<NotFound />} />
             </Routes>
             {/* </Layout> */}

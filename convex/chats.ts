@@ -405,6 +405,35 @@ export const branchChat = mutation({
     },
 });
 
+// Get a single public chat (for shared viewing)
+export const getPublicChat = query({
+    args: { chatId: v.id("chats") },
+    handler: async (ctx, { chatId }) => {
+        const chat = await ctx.table("chats").get(chatId);
+        if (!chat) {
+            return null;
+        }
+
+        // Only return public chats
+        if (chat.visibility !== "public") {
+            return null;
+        }
+
+        // Include user information for public chat
+        const user = await ctx.table("users").get(chat.userId);
+        return {
+            ...chat,
+            user: user
+                ? {
+                      name: user.name,
+                      username: user.username,
+                      imageUrl: user.imageUrl,
+                  }
+                : null,
+        };
+    },
+});
+
 // Get public chats (for discovery)
 export const getPublicChats = query({
     args: {
