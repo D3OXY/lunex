@@ -222,17 +222,24 @@ export const internalUpdateMessages = internalMutation({
                 content: v.string(),
             })
         ),
+        streaming: v.boolean(),
     },
-    handler: async (ctx, { chatId, messages }) => {
+    handler: async (ctx, { chatId, messages, streaming }) => {
         const chat = await ctx.table("chats").get(chatId);
         if (!chat) {
             throw new ConvexError("Chat not found");
         }
 
-        await ctx.table("chats").getX(chatId).patch({
-            messages,
-            updatedAt: Date.now(),
-        });
+        if (streaming) {
+            await ctx.table("chats").getX(chatId).patch({
+                messages,
+            });
+        } else {
+            await ctx.table("chats").getX(chatId).patch({
+                messages,
+                updatedAt: Date.now(),
+            });
+        }
 
         return { success: true };
     },

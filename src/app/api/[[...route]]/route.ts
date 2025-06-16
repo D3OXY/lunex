@@ -55,7 +55,7 @@ const fetchUserPreferences = async (authToken: string): Promise<{ userModels: st
 };
 
 // Helper function to update chat messages in backend
-const updateChatInBackend = async (chatId: string, messages: Array<{ role: "user" | "assistant"; content: string }>, authToken: string): Promise<boolean> => {
+const updateChatInBackend = async (chatId: string, messages: Array<{ role: "user" | "assistant"; content: string }>, authToken: string, streaming: boolean): Promise<boolean> => {
     try {
         const convexSiteUrl = env.NEXT_PUBLIC_CONVEX_URL.replace(".convex.cloud", ".convex.site");
 
@@ -68,6 +68,7 @@ const updateChatInBackend = async (chatId: string, messages: Array<{ role: "user
             body: JSON.stringify({
                 chatId,
                 messages,
+                streaming,
             }),
         });
 
@@ -333,7 +334,7 @@ app.post("/chat/stream", async (c) => {
                                     const updatedMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
 
                                     // Fire and forget - don't await to avoid blocking the stream
-                                    void updateChatInBackend(chatId, updatedMessages, authToken).finally(() => {
+                                    void updateChatInBackend(chatId, updatedMessages, authToken, true).finally(() => {
                                         isUpdating = false;
                                     });
                                 } else {
@@ -360,7 +361,7 @@ app.post("/chat/stream", async (c) => {
                                 const finalMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
 
                                 // Final update - this one we can await since streaming is done
-                                await updateChatInBackend(chatId, finalMessages, authToken);
+                                await updateChatInBackend(chatId, finalMessages, authToken, false);
                             }
                             break;
                     }
@@ -419,7 +420,7 @@ app.post("/chat/stream", async (c) => {
                         const baseMessages = [...currentHistoryMessages, ...newUserMessages];
                         const errorMessages = [...baseMessages, { role: "assistant" as const, content: errorMessage }];
 
-                        await updateChatInBackend(chatId, errorMessages, authToken);
+                        await updateChatInBackend(chatId, errorMessages, authToken, false);
                     } catch (dbError) {
                         console.error("Failed to store error message in database:", dbError);
                     }

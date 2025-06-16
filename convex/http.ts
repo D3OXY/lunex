@@ -40,7 +40,7 @@ http.route({
             }
 
             // Parse and validate request body
-            const { chatId, messages } = (await request.json()) as { chatId: Id<"chats">; messages: CoreMessage[] };
+            const { chatId, messages, streaming } = (await request.json()) as { chatId: Id<"chats">; messages: CoreMessage[]; streaming: boolean };
 
             if (!chatId || !messages) {
                 return new Response(JSON.stringify({ error: "Missing chatId or messages" }), {
@@ -66,6 +66,7 @@ http.route({
             await ctx.runMutation(internal.chats.internalUpdateMessages, {
                 chatId,
                 messages: messages as { role: "user" | "assistant"; content: string }[],
+                streaming,
             });
 
             return new Response(JSON.stringify({ success: true }), {
