@@ -107,7 +107,7 @@ export const ChatInput = ({ chatId, disabled, onSubmit }: { chatId: Id<"chats"> 
                             title={webSearchEnabled ? "Disable web search" : "Enable web search"}
                         >
                             <GlobeIcon size={16} />
-                            <span>Search</span>
+                            <span className="hidden md:block">Search</span>
                         </AIInputButton>
                         <ModelPicker />
                     </AIInputTools>
