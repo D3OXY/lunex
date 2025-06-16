@@ -6,6 +6,7 @@ export const MODELS = {
         provider: "Google",
         features: {
             imageInput: true,
+            featured: true,
         },
     },
     "openai/gpt-4o-mini": {
@@ -19,6 +20,7 @@ export const MODELS = {
         name: "Gemini 2.5 Flash Preview",
         provider: "Google",
         features: {
+            popular: true,
             imageInput: true,
             reasoning: true,
         },
@@ -27,6 +29,7 @@ export const MODELS = {
         name: "Gemini 2.5 Pro Preview",
         provider: "Google",
         features: {
+            popular: true,
             imageInput: true,
             coding: true,
             reasoning: true,
@@ -60,6 +63,7 @@ export const MODELS = {
         name: "DeepSeek R1 0528",
         provider: "DeepSeek",
         features: {
+            popular: true,
             coding: true,
             free: true,
             reasoning: true,
@@ -115,6 +119,7 @@ export const MODELS = {
 } as const;
 
 export type ModelFeatures = {
+    featured?: boolean;
     imageInput?: boolean;
     reasoning?: boolean;
     selfModerated?: boolean;
