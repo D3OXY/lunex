@@ -11,7 +11,7 @@ import { handle } from "hono/vercel";
 const app = new Hono().basePath("/api");
 
 // Configuration for incremental updates - increased to reduce Convex load
-const CHUNK_UPDATE_THRESHOLD = 200; // Update backend every 200 characters
+const CHUNK_UPDATE_THRESHOLD = 300; // Update backend every 200 characters
 const UPDATE_INTERVAL_MS = 3000; // Or every 3 seconds, whichever comes first
 
 // Enable CORS for all routes
