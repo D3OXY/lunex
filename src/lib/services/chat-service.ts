@@ -148,6 +148,7 @@ export function useChatService() {
                     title: "New Chat",
                     messages: [],
                     _creationTime: Date.now(),
+                    updatedAt: Date.now(),
                     branched: false,
                     visibility: "private",
                 };
