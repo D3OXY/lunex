@@ -133,8 +133,9 @@ app.post("/chat/stream", async (c) => {
         modelId?: string;
         authToken?: string;
         webSearchEnabled?: boolean;
+        isTemporary?: boolean;
     } = await c.req.json();
-    const { messages, chatId, modelId, authToken, webSearchEnabled } = body;
+    const { messages, chatId, modelId, authToken, webSearchEnabled, isTemporary } = body;
 
     return stream(c, async (stream) => {
         try {
@@ -148,11 +149,11 @@ app.post("/chat/stream", async (c) => {
                 return;
             }
 
-            if (!chatId) {
+            if (!chatId && !isTemporary) {
                 await stream.write(
                     JSON.stringify({
                         type: "error",
-                        error: "Chat ID is required",
+                        error: "Chat ID is required for permanent chats",
                     }) + "\n"
                 );
                 return;
@@ -168,10 +169,10 @@ app.post("/chat/stream", async (c) => {
                 return;
             }
 
-            // Fetch user preferences and chat history from Convex
+            // Fetch user preferences and chat history from Convex (skip history for temporary chats)
             const [userPreferences, allChatMessages] = await Promise.all([
                 fetchUserPreferences(authToken),
-                fetchChatMessages(chatId, authToken), // Get ALL messages for database operations
+                isTemporary || !chatId ? Promise.resolve([]) : fetchChatMessages(chatId, authToken), // Skip for temporary chats
             ]);
 
             // Limit history for LLM context only
@@ -272,7 +273,7 @@ app.post("/chat/stream", async (c) => {
             });
 
             // Send initial response
-            await stream.write(JSON.stringify({ type: "start", chatId, supportsReasoning }) + "\n");
+            await stream.write(JSON.stringify({ type: "start", chatId: chatId ?? null, supportsReasoning }) + "\n");
 
             let fullResponse = "";
             let lastUpdateLength = 0;
@@ -327,13 +328,17 @@ app.post("/chat/stream", async (c) => {
                                 lastUpdateLength = fullResponse.length;
                                 lastUpdateTime = now;
 
-                                // Update backend asynchronously without blocking the stream
-                                const updatedMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
+                                // Update backend asynchronously without blocking the stream (skip for temporary chats)
+                                if (!isTemporary && chatId) {
+                                    const updatedMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
 
-                                // Fire and forget - don't await to avoid blocking the stream
-                                void updateChatInBackend(chatId, updatedMessages, authToken).finally(() => {
+                                    // Fire and forget - don't await to avoid blocking the stream
+                                    void updateChatInBackend(chatId, updatedMessages, authToken).finally(() => {
+                                        isUpdating = false;
+                                    });
+                                } else {
                                     isUpdating = false;
-                                });
+                                }
                             }
                             break;
                         case "reasoning":
@@ -350,8 +355,8 @@ app.post("/chat/stream", async (c) => {
                             const errorPart = part as { error?: string };
                             throw new Error(`OpenRouter error: ${errorPart.error ?? "Unknown streaming error"}`);
                         case "finish":
-                            // Final update to ensure we have the complete response
-                            if (fullResponse.trim()) {
+                            // Final update to ensure we have the complete response (skip for temporary chats)
+                            if (fullResponse.trim() && !isTemporary && chatId) {
                                 const finalMessages = [...baseMessages, { role: "assistant" as const, content: fullResponse }];
 
                                 // Final update - this one we can await since streaming is done
@@ -381,8 +386,8 @@ app.post("/chat/stream", async (c) => {
                 }) + "\n"
             );
 
-            // Store error as assistant response in database asynchronously (fire and forget)
-            if (messages && chatId && authToken) {
+            // Store error as assistant response in database asynchronously (fire and forget) - skip for temporary chats
+            if (messages && chatId && authToken && !isTemporary) {
                 // Don't await this - do it asynchronously to avoid blocking the response
                 void (async () => {
                     try {

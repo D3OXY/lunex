@@ -167,12 +167,6 @@ export default function Navbar() {
                 </div>
                 <Authenticated>
                     <div className="text-foreground flex items-center gap-2">
-                        {pathname === "/" && (
-                            <Button variant="ghost">
-                                <MessageCircleDashed />
-                                Temporary
-                            </Button>
-                        )}
                         {pathname.startsWith("/chat/") && currentChat && (
                             <Button variant="ghost" onClick={() => setShowChatSettings(true)}>
                                 <MessageCircleQuestion />

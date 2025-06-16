@@ -609,3 +609,55 @@ export const searchChats = query({
         }));
     },
 });
+
+// Save a temporary chat (convert local-only chat to a persistent one)
+export const saveTempChat = mutation({
+    args: {
+        messages: v.array(
+            v.object({
+                role: v.union(v.literal("user"), v.literal("assistant")),
+                content: v.string(),
+            })
+        ),
+    },
+    handler: async (ctx, { messages }) => {
+        const currentUser = await getUserOrThrow(ctx);
+
+        // Basic validation to prevent abuse
+        if (messages.length === 0) {
+            throw new ConvexError("At least one message is required");
+        }
+        if (messages.length > 200) {
+            throw new ConvexError("Too many messages in temporary chat");
+        }
+
+        const sanitizedMessages = messages.map((msg) => {
+            if (msg.content.length > 20000) {
+                throw new ConvexError("Message content too large");
+            }
+            return {
+                role: msg.role,
+                content: msg.content.trim(),
+            } as const;
+        });
+
+        const now = Date.now();
+
+        const chatId = await ctx.table("chats").insert({
+            userId: currentUser._id,
+            title: "New Temp Chat (Saved)",
+            messages: sanitizedMessages,
+            visibility: "private",
+            branched: false,
+            updatedAt: now,
+        });
+
+        // Schedule background title generation if userMessage provided
+        void ctx.scheduler.runAfter(0, api.chats.generateAndUpdateTitle, {
+            chatId,
+            userMessage: sanitizedMessages[0].content,
+        });
+
+        return chatId;
+    },
+});

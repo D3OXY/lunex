@@ -1,7 +1,7 @@
 "use client";
 
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarSeparator, useSidebar } from "@/components/ui/sidebar";
-import { Plus, Search } from "lucide-react";
+import { MessageCircleDashed, Plus, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { SearchCommand } from "./search-command";
@@ -36,6 +36,14 @@ export function SidebarHeader() {
                         <Link to="/">
                             <Plus />
                             New Chat
+                        </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                        <Link to="/temp">
+                            <MessageCircleDashed />
+                            New Temp Chat
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
