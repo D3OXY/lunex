@@ -98,7 +98,7 @@ export function ModelPicker(): React.JSX.Element {
             <DrawerTrigger asChild>
                 <Button variant="outline" className="min-w-[140px] justify-between">
                     <div className="flex items-center gap-2 truncate">
-                        {selectedModelData ? <span className="max-w-[300px] truncate">{selectedModelData.name}</span> : "Select Model"}
+                        {selectedModelData ? <span className="max-w-[200px] truncate">{selectedModelData.name}</span> : "Select Model"}
                     </div>
                     <ChevronDown size={16} className="flex-shrink-0" />
                 </Button>

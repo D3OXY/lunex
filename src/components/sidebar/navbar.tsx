@@ -170,7 +170,7 @@ export default function Navbar() {
                         {pathname.startsWith("/chat/") && currentChat && (
                             <Button variant="ghost" onClick={() => setShowChatSettings(true)}>
                                 <MessageCircleQuestion />
-                                Chat Settings
+                                <span className="hidden md:block">Chat Settings</span>
                             </Button>
                         )}
                         <UserButton showName />
