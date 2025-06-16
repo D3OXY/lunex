@@ -2,23 +2,23 @@
 
 import { ErrorBoundary } from "@/components/providers/ErrorBoundary";
 import SidebarWrapper from "@/components/sidebar/sidebar-wrapper";
-import { Authenticated, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { useState, useEffect } from "react";
-import { toast } from "sonner";
-import { useUserPreferences, useUserModels, useDefaultModel } from "@/lib/stores/preferences-store";
 import { getAllModels } from "@/lib/models";
+import { useDefaultModel, useUserModels, useUserPreferences } from "@/lib/stores/preferences-store";
+import { Authenticated, useMutation } from "convex/react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { api } from "../../convex/_generated/api";
 
 // UI Components
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Key, Bot, Palette, User, Save, Plus, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertCircle, Bot, Key, Plus, Save, X } from "lucide-react";
 
 export default function Settings(): React.JSX.Element {
     // Store hooks
@@ -136,7 +136,7 @@ export default function Settings(): React.JSX.Element {
                                 </div>
 
                                 <Tabs defaultValue="models" className="space-y-6">
-                                    <TabsList className="grid w-full grid-cols-4">
+                                    <TabsList className="grid w-full grid-cols-2">
                                         <TabsTrigger value="models" className="flex items-center gap-2">
                                             <Bot className="h-4 w-4" />
                                             Models
@@ -144,14 +144,6 @@ export default function Settings(): React.JSX.Element {
                                         <TabsTrigger value="api" className="flex items-center gap-2">
                                             <Key className="h-4 w-4" />
                                             API Keys
-                                        </TabsTrigger>
-                                        <TabsTrigger value="appearance" className="flex items-center gap-2">
-                                            <Palette className="h-4 w-4" />
-                                            Appearance
-                                        </TabsTrigger>
-                                        <TabsTrigger value="account" className="flex items-center gap-2">
-                                            <User className="h-4 w-4" />
-                                            Account
                                         </TabsTrigger>
                                     </TabsList>
 
@@ -276,32 +268,6 @@ export default function Settings(): React.JSX.Element {
                                                         </Button>
                                                     </div>
                                                 </div>
-                                            </CardContent>
-                                        </Card>
-                                    </TabsContent>
-
-                                    {/* Appearance Tab */}
-                                    <TabsContent value="appearance" className="space-y-6">
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Theme</CardTitle>
-                                                <CardDescription>Customize the appearance of your interface.</CardDescription>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="text-muted-foreground">Theme settings will be available in a future update.</div>
-                                            </CardContent>
-                                        </Card>
-                                    </TabsContent>
-
-                                    {/* Account Tab */}
-                                    <TabsContent value="account" className="space-y-6">
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Account Information</CardTitle>
-                                                <CardDescription>View and manage your account details.</CardDescription>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="text-muted-foreground">Account management features will be available in a future update.</div>
                                             </CardContent>
                                         </Card>
                                     </TabsContent>
