@@ -87,7 +87,7 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
             startIndex += groups.yesterday.length;
         }
         if (groups.thirtyDays.length > 0) {
-            result.push({ title: "30 Days Ago", chats: groups.thirtyDays, startIndex });
+            result.push({ title: "Last 30 days", chats: groups.thirtyDays, startIndex });
             startIndex += groups.thirtyDays.length;
         }
         if (groups.older.length > 0) {
