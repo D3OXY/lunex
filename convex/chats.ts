@@ -290,7 +290,7 @@ export const editMessage = mutation({
             throw new ConvexError("Can only edit user messages");
         }
 
-        // Truncate messages up to (but not including) the edited message - 1 since we need to delete the users message aswell
+        // Truncate messages up to (but not including) the edited message
         const truncatedMessages = chat.messages.slice(0, messageIndex);
 
         await ctx.table("chats").getX(chatId).patch({
