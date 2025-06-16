@@ -30,7 +30,7 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
                             <SidebarMenuButton asChild>
                                 <Link to="/settings">
                                     <Settings />
-                                    Manage
+                                    Settings
                                 </Link>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
