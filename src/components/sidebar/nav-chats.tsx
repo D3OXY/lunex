@@ -19,9 +19,9 @@ import { useChatService } from "@/lib/services/chat-service";
 import type { Chat } from "@/lib/stores/chat-store";
 import { useChats, useChatStore } from "@/lib/stores/chat-store";
 import { cn } from "@/lib/utils";
-import { GitBranchIcon, MessageSquareIcon, PenLine, X, Globe } from "lucide-react";
+import { GitBranchIcon, MessageSquareIcon, PenLine, X, Globe, Pin, PinOff } from "lucide-react";
 import type { HTMLAttributes, ReactElement } from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -35,12 +35,43 @@ interface ChatGroup {
     startIndex: number;
 }
 
+// Utility to get/set pinned chat IDs in localStorage
+const PINNED_KEY = "lunex:pinnedChats";
+
+const loadPinnedChats = (): string[] => {
+    if (typeof window === "undefined") return [];
+    try {
+        const raw = window.localStorage.getItem(PINNED_KEY);
+        if (!raw) return [];
+        const data = JSON.parse(raw) as string[];
+        return data;
+    } catch {
+        return [];
+    }
+};
+
+const savePinnedChats = (ids: string[]): void => {
+    try {
+        window.localStorage.setItem(PINNED_KEY, JSON.stringify(ids));
+    } catch {
+        /* ignore */
+    }
+};
+
 export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement => {
     const [hoveredChatId, setHoveredChatId] = useState<Id<"chats"> | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [renameDialogOpen, setRenameDialogOpen] = useState(false);
     const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
     const [newTitle, setNewTitle] = useState("");
+
+    // Pinned chat IDs
+    const [pinnedIds, setPinnedIds] = useState<string[]>(() => loadPinnedChats());
+
+    // Sync pinned IDs to localStorage whenever they change
+    useEffect(() => {
+        savePinnedChats(pinnedIds);
+    }, [pinnedIds]);
 
     const chats = useChats();
     const location = useLocation();
@@ -49,6 +80,7 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
     const { removeChat } = useChatStore();
 
     // Memoized chat groups for better performance
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const chatGroups = useMemo((): ChatGroup[] => {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -97,6 +129,48 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
         return result;
     }, [chats]);
 
+    // Separate pinned chats
+    const pinnedChats = chats.filter((c) => pinnedIds.includes(c._id));
+    const unpinnedChats = chats.filter((c) => !pinnedIds.includes(c._id));
+
+    // Recompute chatGroups using unpinnedChats instead of all chats
+    const groupedUnpinned = useMemo(() => {
+        // reuse previous grouping logic but applied to unpinnedChats
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const groups = { today: [] as Chat[], yesterday: [] as Chat[], thirtyDays: [] as Chat[], older: [] as Chat[] };
+
+        unpinnedChats.forEach((chat) => {
+            const chatDate = new Date(chat.updatedAt);
+            if (chatDate >= today) groups.today.push(chat);
+            else if (chatDate >= yesterday) groups.yesterday.push(chat);
+            else if (chatDate >= thirtyDaysAgo) groups.thirtyDays.push(chat);
+            else groups.older.push(chat);
+        });
+
+        let startIndex = 0;
+        const result: ChatGroup[] = [];
+        if (groups.today.length) {
+            result.push({ title: "Today", chats: groups.today, startIndex });
+            startIndex += groups.today.length;
+        }
+        if (groups.yesterday.length) {
+            result.push({ title: "Yesterday", chats: groups.yesterday, startIndex });
+            startIndex += groups.yesterday.length;
+        }
+        if (groups.thirtyDays.length) {
+            result.push({ title: "Last 30 days", chats: groups.thirtyDays, startIndex });
+            startIndex += groups.thirtyDays.length;
+        }
+        if (groups.older.length) {
+            result.push({ title: "Older", chats: groups.older, startIndex });
+        }
+        return result;
+    }, [unpinnedChats]);
+
     const handleDeleteChat = async (chatId: Id<"chats">): Promise<void> => {
         // Immediately remove from local store for instant UI feedback
         removeChat(chatId);
@@ -143,6 +217,8 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
         const href = `/chat/${chat._id}`;
         const isActive = location.pathname === href;
         const isHovered = hoveredChatId === chat._id;
+
+        const isPinned = pinnedIds.includes(chat._id);
 
         const chatIcon = chat.branched ? (
             <GitBranchIcon className="text-muted-foreground group-hover:text-foreground h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200" />
@@ -195,6 +271,17 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
                             className="h-6 w-6 p-0 text-white"
                             onClick={(e) => {
                                 e.stopPropagation();
+                                setPinnedIds((prev) => (isPinned ? prev.filter((id) => id !== chat._id) : [...prev, chat._id]));
+                            }}
+                            title={isPinned ? "Unpin chat" : "Pin chat"}
+                        >
+                            {isPinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-white"
+                            onClick={(e) => {
+                                e.stopPropagation();
                                 setSelectedChat(chat);
                                 setDeleteDialogOpen(true);
                             }}
@@ -236,14 +323,20 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
             <div className={cn("flex h-full flex-col", className)} {...props}>
                 <div className="flex-1 overflow-x-hidden overflow-y-auto">
                     <div className="pb-4">
-                        {chats.length === 0 ? (
+                        {pinnedChats.length === 0 && unpinnedChats.length === 0 ? (
                             <div className="text-muted-foreground animate-in fade-in-50 flex h-32 flex-col items-center justify-center px-2 duration-300">
                                 <MessageSquareIcon className="mb-2 h-6 w-6" />
                                 {sidebarOpen && <p className="text-center text-xs">No chats yet</p>}
                             </div>
                         ) : (
                             <div className="space-y-1">
-                                {chatGroups.map((group) => (
+                                {pinnedChats.length > 0 && (
+                                    <div className="mb-4">
+                                        {sidebarOpen && <div className="text-muted-foreground mb-2 px-2 text-xs font-medium">Pinned</div>}
+                                        <div className="space-y-1">{pinnedChats.map((chat, index) => renderChatItem(chat, index))}</div>
+                                    </div>
+                                )}
+                                {groupedUnpinned.map((group) => (
                                     <div key={group.title} className="mb-4">
                                         {sidebarOpen && <div className="text-muted-foreground mb-2 px-2 text-xs font-medium">{group.title}</div>}
                                         <div className="space-y-1">{group.chats.map((chat, index) => renderChatItem(chat, group.startIndex + index))}</div>
