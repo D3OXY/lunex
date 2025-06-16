@@ -22,6 +22,7 @@ export default function Navbar() {
     const currentChat = useCurrentChat();
     const [showChatSettings, setShowChatSettings] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [processingAction, setProcessingAction] = useState<string | null>(null);
 
     const updateChatVisibility = useMutation(api.chats.updateChatVisibility);
     const branchChat = useMutation(api.chats.branchChat);
@@ -31,6 +32,15 @@ export default function Navbar() {
         if (!currentChat) return;
 
         setIsProcessing(true);
+        setProcessingAction(option);
+
+        // Show immediate feedback
+        if (option === "public") {
+            toast.loading("Making chat public...", { id: "share-chat" });
+        } else {
+            toast.loading("Creating public branch...", { id: "share-chat" });
+        }
+
         try {
             if (option === "public") {
                 // Make current chat public
@@ -42,7 +52,7 @@ export default function Navbar() {
                 // Update local store
                 updateChat(currentChat._id, { visibility: "public" });
 
-                toast.success("Chat is now public and shareable");
+                toast.success("Chat is now public and shareable", { id: "share-chat" });
             } else if (option === "branch-public") {
                 // Create a public branch up to current point
                 const branchedChatId = await branchChat({
@@ -57,7 +67,7 @@ export default function Navbar() {
                     visibility: "public",
                 });
 
-                toast.success("Public branch created successfully");
+                toast.success("Public branch created successfully", { id: "share-chat" });
 
                 // Copy share link to clipboard
                 const shareUrl = `${window.location.origin}/shared/${branchedChatId}`;
@@ -68,9 +78,10 @@ export default function Navbar() {
             setShowChatSettings(false);
         } catch (error: unknown) {
             console.error("Error sharing chat:", error);
-            toast.error("Failed to share chat");
+            toast.error("Failed to share chat", { id: "share-chat" });
         } finally {
             setIsProcessing(false);
+            setProcessingAction(null);
         }
     };
 
@@ -98,6 +109,9 @@ export default function Navbar() {
         if (!currentChat) return;
 
         setIsProcessing(true);
+        setProcessingAction("make-private");
+        toast.loading("Making chat private...", { id: "make-private" });
+
         try {
             await updateChatVisibility({
                 chatId: currentChat._id,
@@ -107,13 +121,14 @@ export default function Navbar() {
             // Update local store
             updateChat(currentChat._id, { visibility: "private" });
 
-            toast.success("Chat is now private");
+            toast.success("Chat is now private", { id: "make-private" });
             setShowChatSettings(false);
         } catch (error: unknown) {
             console.error("Error making chat private:", error);
-            toast.error("Failed to make chat private");
+            toast.error("Failed to make chat private", { id: "make-private" });
         } finally {
             setIsProcessing(false);
+            setProcessingAction(null);
         }
     };
 
@@ -203,13 +218,18 @@ export default function Navbar() {
                                 <RadioGroup>
                                     <div className="space-y-3">
                                         <div
-                                            className="hover:bg-muted/50 flex cursor-pointer items-center space-x-2 rounded-lg border p-3"
-                                            onClick={() => handleShareOption("branch-public")}
+                                            className={`hover:bg-muted/50 flex cursor-pointer items-center space-x-2 rounded-lg border p-3 transition-all ${
+                                                isProcessing ? "cursor-not-allowed opacity-50" : ""
+                                            }`}
+                                            onClick={() => !isProcessing && handleShareOption("branch-public")}
                                         >
-                                            <RadioGroupItem value="branch-public" id="branch-public" />
-                                            <div className="space-y-1">
-                                                <Label htmlFor="branch-public" className="cursor-pointer font-medium">
+                                            <RadioGroupItem value="branch-public" id="branch-public" disabled={isProcessing} />
+                                            <div className="flex-1 space-y-1">
+                                                <Label htmlFor="branch-public" className="flex cursor-pointer items-center gap-2 font-medium">
                                                     Share Current State
+                                                    {processingAction === "branch-public" && (
+                                                        <div className="border-primary h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
+                                                    )}
                                                 </Label>
                                                 <p className="text-muted-foreground text-xs">
                                                     Create a public branch of the conversation up to this point. Future messages stay private.
@@ -218,13 +238,18 @@ export default function Navbar() {
                                         </div>
 
                                         <div
-                                            className="hover:bg-muted/50 flex cursor-pointer items-center space-x-2 rounded-lg border p-3"
-                                            onClick={() => handleShareOption("public")}
+                                            className={`hover:bg-muted/50 flex cursor-pointer items-center space-x-2 rounded-lg border p-3 transition-all ${
+                                                isProcessing ? "cursor-not-allowed opacity-50" : ""
+                                            }`}
+                                            onClick={() => !isProcessing && handleShareOption("public")}
                                         >
-                                            <RadioGroupItem value="public" id="public" />
-                                            <div className="space-y-1">
-                                                <Label htmlFor="public" className="cursor-pointer font-medium">
+                                            <RadioGroupItem value="public" id="public" disabled={isProcessing} />
+                                            <div className="flex-1 space-y-1">
+                                                <Label htmlFor="public" className="flex cursor-pointer items-center gap-2 font-medium">
                                                     Share Entire Chat
+                                                    {processingAction === "public" && (
+                                                        <div className="border-primary h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
+                                                    )}
                                                 </Label>
                                                 <p className="text-muted-foreground text-xs">Make this entire conversation public. New messages will also be visible to others.</p>
                                             </div>
@@ -249,9 +274,15 @@ export default function Navbar() {
                                     </Button>
                                 </div>
                                 <Button variant="outline" size="sm" onClick={() => handleShareOption("branch-public")} className="w-full" disabled={isProcessing}>
+                                    {processingAction === "branch-public" && (
+                                        <div className="border-primary mr-2 h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
+                                    )}
                                     Create Branch & Share Current State
                                 </Button>
                                 <Button variant="destructive" size="sm" onClick={() => handleMakePrivate()} className="w-full" disabled={isProcessing}>
+                                    {processingAction === "make-private" && (
+                                        <div className="border-background mr-2 h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
+                                    )}
                                     Make Private
                                 </Button>
                             </div>
