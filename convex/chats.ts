@@ -15,7 +15,8 @@ export const getUserChats = query({
             .order("desc")
             .take(50); // Limit to 50 most recent chats
 
-        return chats;
+        // Sort by updatedAt in descending order (most recently updated first)
+        return chats.sort((a, b) => b.updatedAt - a.updatedAt);
     },
 });
 
@@ -43,6 +44,7 @@ export const createChat = mutation({
     },
     handler: async (ctx, { title, userMessage }) => {
         const currentUser = await getUserOrThrow(ctx);
+        const now = Date.now();
 
         const chatId = await ctx.table("chats").insert({
             userId: currentUser._id,
@@ -50,6 +52,7 @@ export const createChat = mutation({
             messages: [],
             visibility: "private",
             branched: false,
+            updatedAt: now,
         });
 
         // If userMessage is provided, schedule background title generation
@@ -136,6 +139,7 @@ export const updateChatTitle = mutation({
 
         await ctx.table("chats").getX(chatId).patch({
             title,
+            updatedAt: Date.now(),
         });
 
         return { success: true };
@@ -201,6 +205,7 @@ export const internalUpdateChatTitle = internalMutation({
 
         await ctx.table("chats").getX(chatId).patch({
             title,
+            updatedAt: Date.now(),
         });
 
         return { success: true };
@@ -226,6 +231,7 @@ export const internalUpdateMessages = internalMutation({
 
         await ctx.table("chats").getX(chatId).patch({
             messages,
+            updatedAt: Date.now(),
         });
 
         return { success: true };
@@ -250,6 +256,7 @@ export const updateChatVisibility = mutation({
 
         await ctx.table("chats").getX(chatId).patch({
             visibility,
+            updatedAt: Date.now(),
         });
 
         return { success: true };
@@ -288,6 +295,7 @@ export const editMessage = mutation({
 
         await ctx.table("chats").getX(chatId).patch({
             messages: truncatedMessages,
+            updatedAt: Date.now(),
         });
 
         return { success: true };
@@ -345,6 +353,7 @@ export const regenerateResponse = mutation({
 
         await ctx.table("chats").getX(chatId).patch({
             messages: truncatedMessages,
+            updatedAt: Date.now(),
         });
 
         return { success: true };
@@ -389,6 +398,7 @@ export const branchChat = mutation({
             messages: branchMessages,
             visibility: "private", // Branches are always private by default
             branched: true,
+            updatedAt: Date.now(),
         });
 
         return branchedChatId;
@@ -472,12 +482,16 @@ export const getUserBranches = query({
             .order("desc")
             .take(50);
 
-        return branches.map((branch) => ({
-            _id: branch._id,
-            title: branch.title,
-            messageCount: branch.messages.length,
-            _creationTime: branch._creationTime,
-        }));
+        // Sort by updatedAt in descending order and return branch info
+        return branches
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .map((branch) => ({
+                _id: branch._id,
+                title: branch.title,
+                messageCount: branch.messages.length,
+                _creationTime: branch._creationTime,
+                updatedAt: branch.updatedAt,
+            }));
     },
 });
 
@@ -545,7 +559,14 @@ export const searchChats = query({
                     : null;
             })
             .filter((result): result is NonNullable<typeof result> => result !== null)
-            .sort((a, b) => b.score - a.score) // Sort by relevance score
+            .sort((a, b) => {
+                // Primary sort by relevance score
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+                // Secondary sort by most recently updated
+                return b.chat.updatedAt - a.chat.updatedAt;
+            })
             .slice(0, limit);
 
         return searchResults.map((result) => ({
@@ -555,6 +576,7 @@ export const searchChats = query({
             matchType: result.matchType,
             messageCount: result.chat.messages.length,
             _creationTime: result.chat._creationTime,
+            updatedAt: result.chat.updatedAt,
         }));
     },
 });

@@ -25,6 +25,7 @@ export interface Chat {
     title: string;
     messages: Message[];
     _creationTime: number;
+    updatedAt: number;
     branched: boolean;
     visibility: "public" | "private";
 }

@@ -63,7 +63,7 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
         };
 
         chats.forEach((chat) => {
-            const chatDate = new Date(chat._creationTime);
+            const chatDate = new Date(chat.updatedAt);
             if (chatDate >= today) {
                 groups.today.push(chat);
             } else if (chatDate >= yesterday) {

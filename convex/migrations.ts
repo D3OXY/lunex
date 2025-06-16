@@ -1,6 +1,27 @@
 import { internalMutation } from "./_generated/server";
 import { DEFAULT_MODEL } from "../src/lib/models";
 
+// Migration to backfill existing chats with updatedAt field using creation time
+export const backfillChatUpdatedAt = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        const chats = await ctx.db.query("chats").collect();
+        let updated = 0;
+
+        for (const chat of chats) {
+            // Only update if the updatedAt field doesn't exist
+            if (chat.updatedAt === undefined) {
+                await ctx.db.patch(chat._id, {
+                    updatedAt: chat._creationTime,
+                });
+                updated++;
+            }
+        }
+
+        return { updated };
+    },
+});
+
 // Migration to backfill existing chats with new fields
 export const backfillChatFields = internalMutation({
     args: {},
@@ -51,12 +72,25 @@ export const createDefaultUserPreferences = internalMutation({
     },
 });
 
-// Combined migration to run both backfills
+// Combined migration to run all backfills
 export const runMigrations = internalMutation({
     args: {},
     handler: async (ctx) => {
-        // Run chat backfill
+        // Run chat updatedAt backfill
         const chats = await ctx.db.query("chats").collect();
+        let chatsUpdatedAtBackfilled = 0;
+
+        for (const chat of chats) {
+            // Only update if the updatedAt field doesn't exist
+            if (chat.updatedAt === undefined) {
+                await ctx.db.patch(chat._id, {
+                    updatedAt: chat._creationTime,
+                });
+                chatsUpdatedAtBackfilled++;
+            }
+        }
+
+        // Run chat fields backfill
         let chatsUpdated = 0;
 
         for (const chat of chats) {
@@ -92,6 +126,7 @@ export const runMigrations = internalMutation({
         }
 
         return {
+            chatsUpdatedAtBackfilled,
             chatsUpdated,
             userPreferencesCreated,
         };
