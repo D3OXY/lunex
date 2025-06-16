@@ -23,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUser } from "@clerk/nextjs";
-import { Copy, Edit3, GitBranch, GlobeIcon, RotateCcw, ChevronDown } from "lucide-react";
+import { Copy, Edit3, GitBranch, GlobeIcon, RotateCcw, ChevronDown, MessageCircleDashed } from "lucide-react";
 import { toast } from "sonner";
 
 interface ChatInterfaceProps {
@@ -265,7 +265,30 @@ export function ChatInterface({ chatId }: ChatInterfaceProps): React.JSX.Element
     if (isLoading || !currentUser) {
         return (
             <div className="flex h-full items-center justify-center">
-                <div className="text-muted-foreground">Loading...</div>
+                <div className="space-y-2 text-center">
+                    <div className="border-primary mx-auto h-8 w-8 animate-spin rounded-full border-4 border-t-transparent" />
+                    <div className="text-muted-foreground text-sm">Loading...</div>
+                </div>
+            </div>
+        );
+    }
+
+    // If chatId is provided but chat doesn't exist in our store, show error
+    if (chatId && !currentChat) {
+        return (
+            <div className="flex h-full items-center justify-center">
+                <div className="mx-auto max-w-md space-y-4 p-6 text-center">
+                    <div className="bg-muted mx-auto flex h-16 w-16 items-center justify-center rounded-full">
+                        <MessageCircleDashed className="text-muted-foreground h-8 w-8" />
+                    </div>
+                    <div className="space-y-2">
+                        <h2 className="text-xl font-semibold">Chat Not Found</h2>
+                        <p className="text-muted-foreground text-sm">This chat doesn&apos;t exist, has been deleted, or you don&apos;t have access to it.</p>
+                    </div>
+                    <Button onClick={() => navigate("/")} className="mt-4">
+                        Start New Chat
+                    </Button>
+                </div>
             </div>
         );
     }
