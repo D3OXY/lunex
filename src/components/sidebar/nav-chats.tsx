@@ -1,9 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -14,6 +10,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useSidebar } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useChatService } from "@/lib/services/chat-service";
 import type { Chat } from "@/lib/stores/chat-store";
@@ -23,7 +23,6 @@ import { GitBranchIcon, MessageSquareIcon, PenLine, X } from "lucide-react";
 import type { HTMLAttributes, ReactElement } from "react";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useSidebar } from "@/components/ui/sidebar";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 type NavChatsProps = HTMLAttributes<HTMLDivElement> & {
@@ -138,14 +137,6 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
         setSelectedChat(null);
         setNewTitle("");
         setRenameDialogOpen(false);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent): void => {
-        if (e.key === "Enter") {
-            void saveEdit();
-        } else if (e.key === "Escape") {
-            cancelEdit();
-        }
     };
 
     const renderChatItem = (chat: Chat, animationIndex: number): ReactElement => {
@@ -290,31 +281,40 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
                         <DialogContent className="sm:max-w-[425px]">
                             <DialogHeader>
                                 <DialogTitle>Rename Chat</DialogTitle>
-                                <DialogDescription>Make changes to your chat title here. Click save when you&apos;re done.</DialogDescription>
+                                <DialogDescription>Make changes to your chat title here. Click save or press Enter when you&apos;re done.</DialogDescription>
                             </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="flex flex-col items-center gap-4">
-                                    <Label htmlFor="name" className="text-right">
-                                        Name
-                                    </Label>
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    if (newTitle.trim()) {
+                                        void saveEdit();
+                                    }
+                                }}
+                                className="grid gap-4 py-4"
+                            >
+                                <div className="flex flex-col gap-4">
                                     <Input
                                         id="name"
                                         value={newTitle}
                                         onChange={(e) => setNewTitle(e.target.value)}
-                                        onKeyDown={(e) => handleKeyDown(e)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Escape") {
+                                                cancelEdit();
+                                            }
+                                        }}
                                         className="col-span-3"
                                         autoFocus
                                     />
                                 </div>
-                            </div>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={cancelEdit}>
-                                    Cancel
-                                </Button>
-                                <Button type="submit" onClick={() => void saveEdit()} disabled={!newTitle.trim()}>
-                                    Save changes
-                                </Button>
-                            </DialogFooter>
+                                <DialogFooter>
+                                    <Button variant="outline" type="button" onClick={cancelEdit}>
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={!newTitle.trim()}>
+                                        Save changes
+                                    </Button>
+                                </DialogFooter>
+                            </form>
                         </DialogContent>
                     </Dialog>
                 )}
