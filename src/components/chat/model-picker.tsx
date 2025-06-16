@@ -3,14 +3,14 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
-import { Input } from "@/components/ui/input";
+import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getAllModels, type ModelFeatures } from "@/lib/models";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useUserModels } from "@/lib/stores/preferences-store";
-import { Brain, Check, ChevronDown, Code, ImageIcon, Search, Shield, Sparkles, User } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Brain, Check, ChevronDown, Code, Filter, ImageIcon, Keyboard, Shield, Sparkles, Star, TrendingUp, User, X } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
 
 export function ModelPicker(): React.JSX.Element {
     const { selectedModel, setSelectedModel } = useChatStore();
@@ -19,10 +19,31 @@ export function ModelPicker(): React.JSX.Element {
     const [selectedProvider, setSelectedProvider] = useState<string>("All");
     const [selectedFeature, setSelectedFeature] = useState<string>("All");
     const [isOpen, setIsOpen] = useState(false);
+    const [filterOpen, setFilterOpen] = useState(false);
 
     // Get all models including user-added ones
     const allModels = getAllModels(userModels);
     const selectedModelData = allModels[selectedModel];
+
+    // Handle keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "m") {
+                e.preventDefault();
+                setIsOpen(!isOpen);
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [isOpen]);
+
+    // Reset search when dialog closes
+    useEffect(() => {
+        if (!isOpen) {
+            setSearchQuery("");
+        }
+    }, [isOpen]);
 
     // Get unique providers with user models prioritized
     const providers = useMemo(() => {
@@ -41,9 +62,9 @@ export function ModelPicker(): React.JSX.Element {
     }, [allModels]);
 
     // Available features for filtering
-    const availableFeatures = ["All", "Vision", "Reasoning", "Coding", "Self-Moderated", "Free"];
+    const availableFeatures = ["All", "Featured", "Popular", "Vision", "Reasoning", "Coding", "Self-Moderated", "Free"];
 
-    // Filter models based on search, provider, and features
+    // Filter and sort models
     const filteredModels = useMemo(() => {
         let models = Object.entries(allModels);
 
@@ -57,6 +78,10 @@ export function ModelPicker(): React.JSX.Element {
             models = models.filter(([, model]) => {
                 const features = model.features ?? {};
                 switch (selectedFeature) {
+                    case "Featured":
+                        return features.featured;
+                    case "Popular":
+                        return features.popular;
                     case "Vision":
                         return features.imageInput;
                     case "Reasoning":
@@ -78,153 +103,252 @@ export function ModelPicker(): React.JSX.Element {
             models = models.filter(([modelId, model]) => model.name.toLowerCase().includes(searchQuery.toLowerCase()) || modelId.toLowerCase().includes(searchQuery.toLowerCase()));
         }
 
-        // Sort: User models first, then by name
+        // Sort: User models first, then featured, then popular, then the rest
         models.sort(([, a], [, b]) => {
+            // User models first
             if (a.provider === "User" && b.provider !== "User") return -1;
             if (a.provider !== "User" && b.provider === "User") return 1;
+
+            // Within same provider type, prioritize featured then popular
+            const aFeatured = a.features?.featured ?? false;
+            const bFeatured = b.features?.featured ?? false;
+            const aPopular = a.features?.popular ?? false;
+            const bPopular = b.features?.popular ?? false;
+
+            if (aFeatured && !bFeatured) return -1;
+            if (!aFeatured && bFeatured) return 1;
+            if (aPopular && !bPopular) return -1;
+            if (!aPopular && bPopular) return 1;
+
             return a.name.localeCompare(b.name);
         });
 
         return models;
     }, [allModels, selectedProvider, selectedFeature, searchQuery]);
 
+    // Group models for display
+    const groupedModels = useMemo(() => {
+        const groups = {
+            user: [] as Array<[string, (typeof allModels)[string]]>,
+            featured: [] as Array<[string, (typeof allModels)[string]]>,
+            popular: [] as Array<[string, (typeof allModels)[string]]>,
+            other: [] as Array<[string, (typeof allModels)[string]]>,
+        };
+
+        filteredModels.forEach(([modelId, model]) => {
+            if (model.provider === "User") {
+                groups.user.push([modelId, model]);
+            } else if (model.features?.featured) {
+                groups.featured.push([modelId, model]);
+            } else if (model.features?.popular) {
+                groups.popular.push([modelId, model]);
+            } else {
+                groups.other.push([modelId, model]);
+            }
+        });
+
+        return groups;
+    }, [filteredModels]);
+
     const handleModelSelect = (modelId: string): void => {
         setSelectedModel(modelId);
         setIsOpen(false);
     };
 
-    return (
-        <Drawer open={isOpen} onOpenChange={setIsOpen}>
-            <DrawerTrigger asChild>
-                <Button variant="outline" className="min-w-[140px] justify-between">
-                    <div className="flex items-center gap-2 truncate">
-                        {selectedModelData ? <span className="max-w-[200px] truncate">{selectedModelData.name}</span> : "Select Model"}
+    const handleFilterSelect = (type: "provider" | "feature", value: string): void => {
+        if (type === "provider") {
+            setSelectedProvider(value);
+        } else {
+            setSelectedFeature(value);
+        }
+        setFilterOpen(false);
+    };
+
+    const clearFilters = (): void => {
+        setSelectedProvider("All");
+        setSelectedFeature("All");
+        setFilterOpen(false);
+    };
+
+    const hasActiveFilters = selectedProvider !== "All" || selectedFeature !== "All";
+
+    const renderModelItem = (modelId: string, model: (typeof allModels)[string]) => {
+        const features: ModelFeatures = model.features ?? {};
+        return (
+            <CommandItem key={modelId} value={`${model.name} ${modelId}`} onSelect={() => handleModelSelect(modelId)} className="flex flex-col items-start gap-1 p-3">
+                <div className="flex w-full items-center gap-2">
+                    <span className="font-medium">{model.name}</span>
+                    {model.provider === "User" && (
+                        <Badge variant="secondary" className="text-xs">
+                            Custom
+                        </Badge>
+                    )}
+                    {features.featured && (
+                        <Badge variant="default" className="text-xs">
+                            <Star className="mr-1 h-3 w-3" />
+                            Featured
+                        </Badge>
+                    )}
+                    {features.popular && (
+                        <Badge variant="outline" className="text-xs text-orange-600">
+                            <TrendingUp className="mr-1 h-3 w-3" />
+                            Popular
+                        </Badge>
+                    )}
+                    {features.free && (
+                        <Badge variant="outline" className="text-xs text-green-600">
+                            Free
+                        </Badge>
+                    )}
+                    {selectedModel === modelId && <Check className="text-primary ml-auto h-4 w-4" />}
+                </div>
+
+                <div className="text-muted-foreground font-mono text-xs">{modelId}</div>
+
+                {/* Features */}
+                {(features.imageInput || features.reasoning || features.coding || features.selfModerated) && (
+                    <div className="mt-1 flex flex-wrap gap-2">
+                        {features.imageInput && (
+                            <div className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                                <ImageIcon size={12} />
+                                <span>Vision</span>
+                            </div>
+                        )}
+                        {features.reasoning && (
+                            <div className="flex items-center gap-1 rounded-md bg-purple-50 px-2 py-1 text-xs text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                                <Brain size={12} />
+                                <span>Reasoning</span>
+                            </div>
+                        )}
+                        {features.coding && (
+                            <div className="flex items-center gap-1 rounded-md bg-green-50 px-2 py-1 text-xs text-green-700 dark:bg-green-950 dark:text-green-300">
+                                <Code size={12} />
+                                <span>Coding</span>
+                            </div>
+                        )}
+                        {features.selfModerated && (
+                            <div className="flex items-center gap-1 rounded-md bg-orange-50 px-2 py-1 text-xs text-orange-700 dark:bg-orange-950 dark:text-orange-300">
+                                <Shield size={12} />
+                                <span>Self-Moderated</span>
+                            </div>
+                        )}
                     </div>
-                    <ChevronDown size={16} className="flex-shrink-0" />
-                </Button>
-            </DrawerTrigger>
-            <DrawerContent className="max-h-[80vh]">
-                <div className="mx-auto w-full max-w-4xl">
-                    <DrawerHeader>
-                        <DrawerTitle>Choose AI Model</DrawerTitle>
-                    </DrawerHeader>
+                )}
+            </CommandItem>
+        );
+    };
 
-                    <div className="space-y-4 px-6 pb-6">
-                        {/* Search */}
-                        <div className="relative">
-                            <Search size={16} className="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2 transform" />
-                            <Input placeholder="Search models..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+    return (
+        <>
+            <Button variant="outline" className="min-w-[140px] justify-between" onClick={() => setIsOpen(true)}>
+                <div className="flex items-center gap-2 truncate">
+                    {selectedModelData ? <span className="max-w-[200px] truncate">{selectedModelData.name}</span> : "Select Model"}
+                </div>
+                <ChevronDown size={16} className="flex-shrink-0" />
+            </Button>
+
+            <CommandDialog open={isOpen} onOpenChange={setIsOpen} title="Choose AI Model" description="Search and filter AI models">
+                <CommandInput placeholder="Search models... (⌘M)" value={searchQuery} onValueChange={setSearchQuery} />
+                <div className="flex flex-1 flex-col overflow-hidden">
+                    <ScrollArea className="flex-1">
+                        <CommandList>
+                            <CommandEmpty>{searchQuery.trim() ? "No models found." : "Start typing to search models..."}</CommandEmpty>
+
+                            {/* User Models */}
+                            {groupedModels.user.length > 0 && (
+                                <CommandGroup heading="Your Models">{groupedModels.user.map(([modelId, model]) => renderModelItem(modelId, model))}</CommandGroup>
+                            )}
+
+                            {/* Featured Models */}
+                            {groupedModels.featured.length > 0 && (
+                                <CommandGroup heading="Featured Models">{groupedModels.featured.map(([modelId, model]) => renderModelItem(modelId, model))}</CommandGroup>
+                            )}
+
+                            {/* Popular Models */}
+                            {groupedModels.popular.length > 0 && (
+                                <CommandGroup heading="Popular Models">{groupedModels.popular.map(([modelId, model]) => renderModelItem(modelId, model))}</CommandGroup>
+                            )}
+
+                            {/* Other Models */}
+                            {groupedModels.other.length > 0 && (
+                                <CommandGroup heading="Other Models">{groupedModels.other.map(([modelId, model]) => renderModelItem(modelId, model))}</CommandGroup>
+                            )}
+                        </CommandList>
+                    </ScrollArea>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between border-t p-2">
+                        <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                            <Keyboard className="h-3 w-3" />
+                            <span>⌘M to open</span>
                         </div>
 
-                        {/* Provider Filter */}
-                        <div>
-                            <div className="mb-2 text-sm font-medium">Provider</div>
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                                {providers.map((provider) => (
-                                    <Button
-                                        key={provider}
-                                        variant={selectedProvider === provider ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => setSelectedProvider(provider)}
-                                        className="flex-shrink-0"
-                                    >
-                                        {provider === "User" && <User size={14} className="mr-1" />}
-                                        {provider}
+                        <div className="flex items-center gap-1">
+                            {hasActiveFilters && (
+                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearFilters}>
+                                    <X className="mr-1 h-3 w-3" />
+                                    Reset
+                                </Button>
+                            )}
+                            <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="relative h-7 w-7 p-0">
+                                        <Filter className={`h-4 w-4 ${hasActiveFilters ? "text-primary" : ""}`} />
+                                        {hasActiveFilters && <div className="bg-primary absolute -top-1 -right-1 h-2 w-2 rounded-full" />}
                                     </Button>
-                                ))}
-                            </div>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 p-0" align="end">
+                                    <div className="max-h-80 overflow-y-auto">
+                                        <div className="p-1">
+                                            <CommandList>
+                                                <CommandGroup heading="Provider">
+                                                    {providers.map((provider) => (
+                                                        <CommandItem key={provider} onSelect={() => handleFilterSelect("provider", provider)}>
+                                                            {provider === "User" && <User className="mr-2 h-4 w-4" />}
+                                                            <span>{provider}</span>
+                                                            {selectedProvider === provider && <Check className="ml-auto h-4 w-4" />}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+
+                                                <CommandSeparator />
+
+                                                <CommandGroup heading="Capabilities">
+                                                    {availableFeatures.map((feature) => (
+                                                        <CommandItem key={feature} onSelect={() => handleFilterSelect("feature", feature)}>
+                                                            {feature === "Featured" && <Star className="mr-2 h-4 w-4" />}
+                                                            {feature === "Popular" && <TrendingUp className="mr-2 h-4 w-4" />}
+                                                            {feature === "Vision" && <ImageIcon className="mr-2 h-4 w-4" />}
+                                                            {feature === "Reasoning" && <Brain className="mr-2 h-4 w-4" />}
+                                                            {feature === "Coding" && <Code className="mr-2 h-4 w-4" />}
+                                                            {feature === "Self-Moderated" && <Shield className="mr-2 h-4 w-4" />}
+                                                            {feature === "Free" && <Sparkles className="mr-2 h-4 w-4" />}
+                                                            <span>{feature}</span>
+                                                            {selectedFeature === feature && <Check className="ml-auto h-4 w-4" />}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+
+                                                {hasActiveFilters && (
+                                                    <>
+                                                        <CommandSeparator />
+                                                        <CommandGroup>
+                                                            <CommandItem onSelect={clearFilters}>
+                                                                <X className="mr-2 h-4 w-4" />
+                                                                <span>Clear All Filters</span>
+                                                            </CommandItem>
+                                                        </CommandGroup>
+                                                    </>
+                                                )}
+                                            </CommandList>
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                         </div>
-
-                        {/* Feature Filter */}
-                        <div>
-                            <div className="mb-2 text-sm font-medium">Capabilities</div>
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                                {availableFeatures.map((feature) => (
-                                    <Button
-                                        key={feature}
-                                        variant={selectedFeature === feature ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => setSelectedFeature(feature)}
-                                        className="flex-shrink-0"
-                                    >
-                                        {feature === "Vision" && <ImageIcon size={14} className="mr-1" />}
-                                        {feature === "Reasoning" && <Brain size={14} className="mr-1" />}
-                                        {feature === "Coding" && <Code size={14} className="mr-1" />}
-                                        {feature === "Self-Moderated" && <Shield size={14} className="mr-1" />}
-                                        {feature === "Free" && <Sparkles size={14} className="mr-1" />}
-                                        {feature}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Models List */}
-                        <ScrollArea className="h-[400px]">
-                            <div className="space-y-2">
-                                {filteredModels.length === 0 ? (
-                                    <div className="text-muted-foreground py-8 text-center">No models found</div>
-                                ) : (
-                                    filteredModels.map(([modelId, model]) => {
-                                        const features: ModelFeatures = model.features ?? {};
-                                        return (
-                                            <Button key={modelId} variant="ghost" className="h-auto w-full justify-between p-4" onClick={() => handleModelSelect(modelId)}>
-                                                <div className="flex flex-1 flex-col items-start gap-2">
-                                                    <div className="flex w-full items-center gap-2">
-                                                        <span className="font-medium">{model.name}</span>
-                                                        {model.provider === "User" && (
-                                                            <Badge variant="secondary" className="text-xs">
-                                                                Custom
-                                                            </Badge>
-                                                        )}
-                                                        {features.free && (
-                                                            <Badge variant="outline" className="text-xs text-green-600">
-                                                                Free
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="text-muted-foreground font-mono text-xs">{modelId}</div>
-
-                                                    {/* Features */}
-                                                    {(features.imageInput || features.reasoning || features.coding || features.selfModerated) && (
-                                                        <div className="mt-1 flex flex-wrap gap-2">
-                                                            {features.imageInput && (
-                                                                <div className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                                                                    <ImageIcon size={12} />
-                                                                    <span>Vision</span>
-                                                                </div>
-                                                            )}
-                                                            {features.reasoning && (
-                                                                <div className="flex items-center gap-1 rounded-md bg-purple-50 px-2 py-1 text-xs text-purple-700 dark:bg-purple-950 dark:text-purple-300">
-                                                                    <Brain size={12} />
-                                                                    <span>Reasoning</span>
-                                                                </div>
-                                                            )}
-                                                            {features.coding && (
-                                                                <div className="flex items-center gap-1 rounded-md bg-green-50 px-2 py-1 text-xs text-green-700 dark:bg-green-950 dark:text-green-300">
-                                                                    <Code size={12} />
-                                                                    <span>Coding</span>
-                                                                </div>
-                                                            )}
-                                                            {features.selfModerated && (
-                                                                <div className="flex items-center gap-1 rounded-md bg-orange-50 px-2 py-1 text-xs text-orange-700 dark:bg-orange-950 dark:text-orange-300">
-                                                                    <Shield size={12} />
-                                                                    <span>Self-Moderated</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {selectedModel === modelId && <Check size={16} className="text-primary flex-shrink-0" />}
-                                            </Button>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </ScrollArea>
                     </div>
                 </div>
-            </DrawerContent>
-        </Drawer>
+            </CommandDialog>
+        </>
     );
 }

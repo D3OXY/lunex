@@ -119,6 +119,7 @@ export const MODELS = {
 } as const;
 
 export type ModelFeatures = {
+    popular?: boolean;
     featured?: boolean;
     imageInput?: boolean;
     reasoning?: boolean;
