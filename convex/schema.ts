@@ -23,6 +23,7 @@ const schema = defineEntSchema({
                 content: v.string(),
             })
         ),
+        updatedAt: v.number(),
     }).index("by_user", ["userId"]),
     userPreferences: defineEnt({
         userId: v.id("users"),
