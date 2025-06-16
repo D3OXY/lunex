@@ -1,11 +1,13 @@
 "use client";
 
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useCurrentChat } from "@/lib/stores/chat-store";
 import { UserButton } from "@clerk/nextjs";
 import { Authenticated } from "convex/react";
+import { MessageCircleDashed, MessageCircleQuestion } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 export default function Navbar() {
@@ -42,6 +44,18 @@ export default function Navbar() {
             </div>
             <Authenticated>
                 <div className="text-foreground flex items-center gap-2">
+                    {pathname === "/" && (
+                        <Button variant="ghost">
+                            <MessageCircleDashed />
+                            Temporary
+                        </Button>
+                    )}
+                    {pathname.startsWith("/chat/") && currentChat && (
+                        <Button variant="ghost">
+                            <MessageCircleQuestion />
+                            Chat Settings
+                        </Button>
+                    )}
                     <UserButton showName />
                 </div>
             </Authenticated>
