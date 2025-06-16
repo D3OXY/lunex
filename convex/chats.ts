@@ -635,6 +635,12 @@ export const saveTempChat = mutation({
             if (msg.content.length > 20000) {
                 throw new ConvexError("Message content too large");
             }
+            if (msg.content.length === 0) {
+                throw new ConvexError("Message content cannot be empty");
+            }
+            if (msg.role !== "user" && msg.role !== "assistant") {
+                throw new ConvexError("Invalid message role");
+            }
             return {
                 role: msg.role,
                 content: msg.content.trim(),
@@ -655,7 +661,7 @@ export const saveTempChat = mutation({
         // Schedule background title generation if userMessage provided
         void ctx.scheduler.runAfter(0, api.chats.generateAndUpdateTitle, {
             chatId,
-            userMessage: sanitizedMessages[0].content,
+            userMessage: sanitizedMessages[0]?.content ?? "New Chat",
         });
 
         return chatId;
