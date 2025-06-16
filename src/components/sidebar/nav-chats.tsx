@@ -293,7 +293,7 @@ export const NavChats = ({ className, ...props }: NavChatsProps): ReactElement =
                                 <DialogDescription>Make changes to your chat title here. Click save when you&apos;re done.</DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-4 py-4">
-                                <div className="grid grid-cols-4 items-center gap-4">
+                                <div className="flex flex-col items-center gap-4">
                                     <Label htmlFor="name" className="text-right">
                                         Name
                                     </Label>
