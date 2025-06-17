@@ -1,29 +1,83 @@
-# Create T3 App
+# Lunex Chat
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+Your AI-powered conversation companion built with Next.js, React Router, and Convex.
 
-## What's next? How do I make an app with this?
+## Features
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+- Real-time AI chat conversations
+- User authentication with Clerk
+- File upload support (images, PDFs)
+- Chat branching and regeneration
+- Temporary chat mode
+- Model selection and customization
+- Search functionality across chats
+- **Query Parameter Integration** - Create chats directly from URL
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+## Query Parameter Feature
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+You can create a new chat and start a conversation directly by visiting a URL with a query parameter:
 
-## Learn More
+### Usage
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+```
+https://your-domain.com/?q=your+question+here
+https://your-domain.com/?q=How%20does%20AI%20work%3F
+```
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+### Examples
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+- `/?q=What is React?` - Creates a new chat asking "What is React?"
+- `/?q=Explain quantum computing` - Creates a new chat asking "Explain quantum computing"
+- `/chat/existing-chat-id?q=Follow up question` - Adds a question to an existing empty chat
 
-## How do I deploy this?
+### How it works
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+1. **Home Page**: When visiting `/` with a `q` parameter, it automatically creates a new chat and sends the message
+2. **Existing Chat**: When visiting `/chat/:id` with a `q` parameter, it sends the message to that chat if it's empty
+3. **URL Encoding**: Special characters are automatically encoded/decoded for safe URL usage
+4. **Navigation**: After processing the query parameter, users are redirected to the appropriate chat
+
+### Integration Examples
+
+You can create links or buttons that redirect users to start specific conversations:
+
+```html
+<!-- HTML Link -->
+<a href="/?q=Tell me about AI">Ask about AI</a>
+
+<!-- JavaScript -->
+window.location.href = "/?q=" + encodeURIComponent("What is machine learning?");
+```
+
+```javascript
+// React Component
+import { createUrlWithQuery } from "@/lib/utils";
+
+function QuickStart() {
+    const handleQuickQuestion = (question) => {
+        window.location.href = createUrlWithQuery("/", question);
+    };
+
+    return <button onClick={() => handleQuickQuestion("Explain React hooks")}>Ask about React hooks</button>;
+}
+```
+
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies: `pnpm install`
+3. Set up environment variables
+4. Run the development server: `pnpm dev`
+
+## Tech Stack
+
+- **Frontend**: Next.js, React Router, TypeScript
+- **Backend**: Convex (database & functions)
+- **Authentication**: Clerk
+- **Styling**: Tailwind CSS
+- **State Management**: Zustand
+- **File Upload**: UploadThing
+
+## License
+
+MIT License

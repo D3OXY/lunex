@@ -9,8 +9,10 @@ import { PlusCircle, Compass, Code, Book } from "lucide-react";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useChatService } from "@/lib/services/chat-service";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSyncContext } from "@/app/context/sync-context";
+import { useEffect } from "react";
+import { getQueryParam } from "@/lib/utils";
 
 export default function Home(): React.JSX.Element {
     const { query, setQuery, selectedModel } = useChatStore();
@@ -21,6 +23,32 @@ export default function Home(): React.JSX.Element {
     const { currentUser } = useSyncContext();
     const { sendMessage } = useChatService();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+
+    // Handle query parameter on mount
+    useEffect(() => {
+        const qParam = getQueryParam(searchParams, "q");
+        if (qParam && currentUser?._id && !isSubmitting) {
+            // Auto-submit the query from URL parameter
+            const handleAutoSubmit = async (): Promise<void> => {
+                setIsSubmitting(true);
+                setQuery(""); // Clear the input since we're using the URL param
+
+                try {
+                    await sendMessage(qParam.trim(), selectedModel, undefined, currentUser._id, (chatId) => {
+                        // Navigate to the new chat immediately
+                        void navigate(`/chat/${chatId}`, { replace: true });
+                    });
+                } catch (error) {
+                    console.error("Failed to create chat from URL parameter:", error);
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+
+            void handleAutoSubmit();
+        }
+    }, [searchParams, currentUser, selectedModel, sendMessage, navigate, isSubmitting, setQuery]);
 
     return (
         <Authenticated>
