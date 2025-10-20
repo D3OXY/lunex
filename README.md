@@ -1,6 +1,6 @@
 # Lunex
 
-Lunex is an open-source, AI-powered conversation platform built with a modern tech stack. It provides a feature-rich, real-time chat experience that is both extensible and easy to use.
+Lunex is an open-source, modern, feature-rich AI chat application built with a modern tech stack. It provides a feature-rich, real-time chat experience that is both extensible and easy to use.
 
 The project is hosted and can be accessed at [lunex.deoxy.dev](https://lunex.deoxy.dev).
 
