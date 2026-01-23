@@ -9,6 +9,22 @@ export const MODELS = {
             featured: true,
         },
     },
+    "openai/gpt-oss-120b:free": {
+        name: "GPT-OSS 120B",
+        provider: "OpenAI",
+        features: {
+            featured: true,
+            free: true,
+        },
+    },
+    "openai/gpt-oss-20b:free": {
+        name: "GPT-OSS 20B",
+        provider: "OpenAI",
+        features: {
+            featured: true,
+            free: true,
+        },
+    },
     "openai/gpt-4o-mini": {
         name: "GPT-4o Mini",
         provider: "OpenAI",
@@ -16,15 +32,21 @@ export const MODELS = {
             imageInput: true,
         },
     },
-    "google/gemini-2.5-flash-preview-05-20": {
-        name: "Gemini 2.5 Flash Preview",
-        provider: "Google",
+    "xiaomi/mimo-v2-flash:free": {
+        name: "Mimo V2 Flash",
+        provider: "Xiaomi",
         features: {
-            popular: true,
-            imageInput: true,
-            reasoning: true,
+            free: true,
         },
     },
+    "z-ai/glm-4.5-air:free": {
+        name: "GLM 4.5 Air",
+        provider: "Z-AI",
+        features: {
+            featured: true,
+            free: true,
+        },
+    },  
     "google/gemini-2.5-pro-preview": {
         name: "Gemini 2.5 Pro Preview",
         provider: "Google",
@@ -69,11 +91,12 @@ export const MODELS = {
             reasoning: true,
         },
     },
-    "google/gemma-3-1b-it:free": {
-        name: "Gemma 3 1B",
+    "google/gemma-3-27b-it:free": {
+        name: "Gemma 3 27B IT",
         provider: "Google",
         features: {
             free: true,
+            featured: true,
         },
     },
     "deepseek/deepseek-chat-v3-0324:free": {
@@ -95,13 +118,6 @@ export const MODELS = {
         provider: "Mistral",
         features: {
             free: true,
-        },
-    },
-    "anthropic/claude-3-haiku:beta": {
-        name: "Claude 3 Haiku (Self Moderated)",
-        provider: "Anthropic",
-        features: {
-            selfModerated: true,
         },
     },
     "anthropic/claude-3-haiku": {
